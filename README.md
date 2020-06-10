@@ -1,5 +1,6 @@
 # DeepMergeDomainAdaptation
 Fisher deep domain adaptation for astronomy - galaxy mergers. 
+![](images/source_target.png)
 
 ### Abstract
 Working with images from two domains is a challanging problem in all domains of computer vision. In astronomy, transferability of deep learning models from simulated to real observed images or from one telescope to another, is a necessity. 
