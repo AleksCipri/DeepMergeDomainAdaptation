@@ -1,5 +1,4 @@
 # DeepMergeDomainAdaptation
-TEST TEST
 Fisher deep domain adaptation for astronomy - galaxy mergers. 
 ![](images/source_target.png)
 
