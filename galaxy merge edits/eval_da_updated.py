@@ -114,14 +114,24 @@ def test(config):
 
     #sampling WOR, i guess we leave the 10 in the middle to validate?
     pristine_indices = torch.randperm(len(pristine_x))
+    #train
     pristine_x_train = pristine_x[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
     pristine_y_train = pristine_y[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
+    #validate --- gets passed into test functions in train file
+    pristine_x_valid = pristine_x[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
+    pristine_y_valid = pristine_y[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
+    #test for evaluation file
     pristine_x_test = pristine_x[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
     pristine_y_test = pristine_y[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
 
     noisy_indices = torch.randperm(len(noisy_x))
+    #train
     noisy_x_train = noisy_x[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
     noisy_y_train = noisy_y[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
+    #validate --- gets passed into test functions in train file
+    noisy_x_valid = noisy_x[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
+    noisy_y_valid = noisy_y[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
+    #test for evaluation file
     noisy_x_test = noisy_x[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
     noisy_y_test = noisy_y[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
 
@@ -129,14 +139,29 @@ def test(config):
     dsets["source"] = TensorDataset(pristine_x_train, pristine_y_train)
     dsets["target"] = TensorDataset(noisy_x_train, noisy_y_train)
 
+    dsets["source_valid"] = TensorDataset(pristine_x_valid, pristine_y_valid)
+    dsets["target_valid"] = TensorDataset(noisy_x_valid, noisy_y_valid)
+
     dsets["source_test"] = TensorDataset(pristine_x_test, pristine_y_test)
     dsets["target_test"] = TensorDataset(noisy_x_test, noisy_y_test)
 
+
+    # data_config = config["data"]
+    # dsets["source"] = ImageList(stratify_sampling(open(data_config["source"]["list_path"]).readlines(), ratio=prep_config["source_size"]), \
+    #                             transform=prep_dict["source"])
+
+    #put your dataloaders here
+    #i stole batch size numbers from below
     dset_loaders["source"] = DataLoader(dsets["source"], batch_size = 36, shuffle = True, num_workers = 1)
     dset_loaders["target"] = DataLoader(dsets["target"], batch_size = 36, shuffle = True, num_workers = 1)
 
+    #guessing batch size based on what was done for testing in the original file
+    dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 4, shuffle = True, num_workers = 1)
+    dset_loaders["target_valid"] = DataLoader(dsets["target_valid"], batch_size = 4, shuffle = True, num_workers = 1)
+
     dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 4, shuffle = True, num_workers = 1)
     dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 4, shuffle = True, num_workers = 1)
+
 
     # dsets["source"] = ImageList(open(data_config["source"]["list_path"]).readlines(), \
     #                             transform=prep_dict["source"])
@@ -183,8 +208,10 @@ def test(config):
     # base_network = torch.load(config["ckpt_path"])[0]
     # recommended practice
     ckpt = torch.load(config['ckpt_path'])
-    print('recorded best precision: {:0.4f} at step {}'.format(ckpt["precision"], ckpt["step"]))
-    train_accuracy = ckpt["precision"]
+    print('recorded best training accuracy: {:0.4f} at step {}'.format(ckpt["train accuracy"], ckpt["step"]))
+    print('recorded best validation accuracy: {:04f} at step {}'.format(ckpt["valid accuracy"], ckpt["step"]))
+    train_accuracy = ckpt["train accuracy"]
+    valid_accuracy = ckpt["valid accuracy"]
     ## set base network
     net_config = config["network"]
     base_network = net_config["name"](**net_config["params"])
@@ -205,8 +232,8 @@ def test(config):
     print("start test: ")
     base_network.train(False)
     if config["ly_type"] == 'cosine':
-        test_acc, test_confusion_matrix = image_classification_test(dset_loaders, \
-            base_network, test_10crop=False, \
+        test_acc, test_confusion_matrix = image_classification_test(dset_loaders, str(config["domain"]), \
+            base_network, \
             gpu=use_gpu)
     elif config["ly_type"] == "euclidean":
         eval_centroids = None
@@ -214,17 +241,17 @@ def test(config):
             eval_centroids = centroids
         if target_centroids is not None:
             eval_centroids = target_centroids
-        test_acc, test_confusion_matrix = distance_classification_test(dset_loaders, \
-            base_network, eval_centroids, test_10crop=False, \
+        test_acc, test_confusion_matrix = distance_classification_test(dset_loaders, str(config["domain"]), \
+            base_network, eval_centroids, \
             gpu=use_gpu)
 
     # save train/test accuracy as pkl file
     with open(os.path.join(config["output_path"], 'accuracy.pkl'), 'wb') as pkl_file:
-        pkl.dump({'train': train_accuracy, 'test': test_acc}, pkl_file)
+        pkl.dump({'train': train_accuracy, 'valid': valid_accuracy, 'test': test_acc}, pkl_file)
     
     np.set_printoptions(precision=2)
-    log_str = "train precision: {:.5f}\ttest precision: {:.5f}\nconfusion matrix:\n{}\n".format(
-        train_accuracy, test_acc, test_confusion_matrix)
+    log_str = "train accuracy: {:.5f}\tvalid accuracy: {:5f}\ttest accuracy: {:.5f}\nconfusion matrix:\n{}\n".format(
+        train_accuracy, valid_accuracy, test_acc, test_confusion_matrix)
     config["out_file"].write(log_str)
     config["out_file"].flush()
     print(log_str)
@@ -239,6 +266,7 @@ if __name__ == "__main__":
     parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
     parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path list")
+    parser.add_argument('--domain', type=str, default='source_test', help="Either source_test or target_test")
     # parser.add_argument('--t_dset_path', type=str, default='../data/office/webcam_10_list.txt', help="The target dataset path list")
     parser.add_argument('--ckpt_path', type=str, required=True, help="path to load ckpt")
     args = parser.parse_args()
@@ -278,6 +306,7 @@ if __name__ == "__main__":
 
     config["dataset"] = args.dset
     config["path"] = args.dset_path
+    config["domain"] = args.domain
 
     if config["dataset"] == 'galaxy': 
         pristine_x = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy'))

@@ -77,8 +77,8 @@ def train(config):
     pristine_x_train = pristine_x[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
     pristine_y_train = pristine_y[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
     #validate --- gets passed into test functions in train file
-    pristine_x_valid = pristine_x[pristine_index[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
-    pristine_y_valid = pristine_y[pristine_index[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
+    pristine_x_valid = pristine_x[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
+    pristine_y_valid = pristine_y[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
     #test for evaluation file
     pristine_x_test = pristine_x[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
     pristine_y_test = pristine_y[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
@@ -88,8 +88,8 @@ def train(config):
     noisy_x_train = noisy_x[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
     noisy_y_train = noisy_y[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
     #validate --- gets passed into test functions in train file
-    noisy_x_valid = noisy_x[noisy_index[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
-    noisy_y_valid = noisy_y[noisy_index[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
+    noisy_x_valid = noisy_x[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
+    noisy_y_valid = noisy_y[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
     #test for evaluation file
     noisy_x_test = noisy_x[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
     noisy_y_test = noisy_y[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
@@ -202,23 +202,27 @@ def train(config):
     ## train   
     len_train_source = len(dset_loaders["source"]) - 1
     len_train_target = len(dset_loaders["target"]) - 1
+    len_valid_source = len(dset_loaders["source_valid"]) - 1
+    len_valid_target = len(dset_loaders["target_valid"]) - 1
+
     transfer_loss_value = classifier_loss_value = total_loss_value = 0.0
     best_acc = 0.0
+
     for i in range(config["num_iterations"]):
         if i % config["test_interval"] == 0:
             base_network.train(False)
             if config['loss']['ly_type'] == "cosine":
-                temp_acc = image_classification_test(dset_loaders, 'source_valid', \
+                temp_acc, _ = image_classification_test(dset_loaders, 'source_valid', \
                     base_network, \
                     gpu=use_gpu)
-                train_acc = image_classification_test(dset_loaders, 'source', \
+                train_acc, _ = image_classification_test(dset_loaders, 'source', \
                     base_network, \
                     gpu=use_gpu)
             elif config['loss']['ly_type'] == "euclidean":
                 temp_acc, _ = distance_classification_test(dset_loaders, 'source_valid', \
                     base_network, center_criterion.centers.detach(), \
                     gpu=use_gpu)
-                train_acc = distance_classification_test(dset_loaders, 'source', \
+                train_acc, _ = distance_classification_test(dset_loaders, 'source', \
                     base_network, \
                     gpu=use_gpu)
             else:
@@ -226,7 +230,8 @@ def train(config):
             
             snapshot_obj = {'step': i, 
                             "base_network": base_network.state_dict(), 
-                            'precision': temp_acc, 
+                            'valid accuracy': temp_acc,
+                            'train accuracy' : train_acc,
                             }
             snapshot_obj['center_criterion'] = center_criterion.state_dict()
             if temp_acc > best_acc:
@@ -234,10 +239,11 @@ def train(config):
                 # save best model
                 torch.save(snapshot_obj, 
                            osp.join(config["output_path"], "best_model.pth.tar"))
-            log_str = "iter: {:05d}, {} precision: {:.5f}\n".format(i, config['loss']['ly_type'], temp_acc)
+            log_str = "iter: {:05d}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i, config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
             config["out_file"].write(log_str)
             config["out_file"].flush()
-            writer.add_scalar("precision", temp_acc, i)
+            writer.add_scalar("validation accuracy", temp_acc, i)
+            writer.add_scalar("training accuracy", train_acc, i)
 
             if early_stop_engine.is_stop_training(temp_acc):
                 config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
@@ -258,8 +264,14 @@ def train(config):
             iter_source = iter(dset_loaders["source"])
         if i % len_train_target == 0:
             iter_target = iter(dset_loaders["target"])
-        inputs_source, labels_source = iter_source.next()
-        inputs_target, labels_target = iter_target.next()
+
+        try:
+            inputs_source, labels_source = iter_source.next()
+            inputs_target, labels_target = iter_target.next()
+        except StopIteration:
+            iter_source = iter(dset_loaders["source"])
+            iter_target = iter(dset_loaders["target"])
+
         if use_gpu:
             inputs_source, inputs_target, labels_source = \
                 Variable(inputs_source).cuda(), Variable(inputs_target).cuda(), \
@@ -305,20 +317,89 @@ def train(config):
         optimizer.step()
 
         if i % config["log_iter"] == 0:
-            config['out_file'].write('iter {} transfer loss={:0.4f}, cls loss={:0.4f}, '
-                'em loss={:0.4f}, '
-                'mmc loss={:0.4f}, intra loss={:0.4f}, inter loss={:0.4f}\n'.format(
+            config['out_file'].write('iter {} train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
+                'train entropy min loss={:0.4f}, '
+                'train fisher loss={:0.4f}, train intra-group fisher loss={:0.4f}, train inter-group fisher loss={:0.4f}\n'.format(
                 i, transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
                 em_loss.data.cpu().float().item(), 
                 fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
                 ))
             config['out_file'].flush()
-            writer.add_scalar("total_loss", total_loss.data.cpu().float().item(), i)
-            writer.add_scalar("cls_loss", classifier_loss.data.cpu().float().item(), i)
-            writer.add_scalar("transfer_loss", transfer_loss.data.cpu().float().item(), i)
-            writer.add_scalar("d_loss/total", fisher_loss.data.cpu().float().item(), i)
-            writer.add_scalar("d_loss/intra", fisher_intra_loss.data.cpu().float().item(), i)
-            writer.add_scalar("d_loss/inter", fisher_inter_loss.data.cpu().float().item(), i)
+            writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i)
+            writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i)
+            writer.add_scalar("training transfer loss", transfer_loss.data.cpu().float().item(), i)
+            writer.add_scalar("training total fisher loss", fisher_loss.data.cpu().float().item(), i)
+            writer.add_scalar("training intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i)
+            writer.add_scalar("training inter fisher", fisher_inter_loss.data.cpu().float().item(), i)
+
+        #attempted validation step
+        #if i < len_valid_source:
+        base_network.eval()
+        with torch.no_grad():
+            if i % len_valid_source == 0:
+                iter_source = iter(dset_loaders["source_valid"])
+            if i % len_valid_target == 0:
+                iter_target = iter(dset_loaders["target_valid"])
+
+            try:
+                inputs_source, labels_source = iter_source.next()
+                inputs_target, labels_target = iter_target.next()
+
+            except StopIteration:
+                iter_source = iter(dset_loaders["source_valid"])
+                iter_target = iter(dset_loaders["target_valid"])
+
+            if use_gpu:
+                inputs_source, inputs_target, labels_source = \
+                    Variable(inputs_source).cuda(), Variable(inputs_target).cuda(), \
+                    Variable(labels_source).cuda()
+            else:
+                inputs_source, inputs_target, labels_source = Variable(inputs_source), \
+                    Variable(inputs_target), Variable(labels_source)
+               
+            inputs = torch.cat((inputs_source, inputs_target), dim=0)
+            source_batch_size = inputs_source.size(0)
+
+            if config['loss']['ly_type'] == 'cosine':
+                features, logits = base_network(inputs)
+                source_logits = logits.narrow(0, 0, source_batch_size)
+            elif config['loss']['ly_type'] == 'euclidean':
+                features, _ = base_network(inputs)
+                logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
+                source_logits = logits.narrow(0, 0, source_batch_size)
+
+            transfer_loss = transfer_criterion(features[:source_batch_size], features[source_batch_size:])
+
+            # source domain classification task loss
+            classifier_loss = class_criterion(source_logits, labels_source.long())
+            # fisher loss on labeled source domain
+            fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=loss_params["inter_type"], 
+                                                                                   intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
+            # entropy minimization loss
+            em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
+            
+            # final loss
+            total_loss = loss_params["trade_off"] * transfer_loss \
+                         + fisher_loss \
+                         + loss_params["em_loss_coef"] * em_loss \
+                         + classifier_loss
+            #total_loss.backward() no backprop on the eval mode
+
+        if i % config["log_iter"] == 0:
+            config['out_file'].write('iter {} valid transfer loss={:0.4f}, valid classifier loss={:0.4f}, '
+                'valid entropy min loss={:0.4f}, '
+                'valid fisher loss={:0.4f}, valid intra-group fisher loss={:0.4f}, valid inter-group fisher loss={:0.4f}\n'.format(
+                i, transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
+                em_loss.data.cpu().float().item(), 
+                fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
+                ))
+            config['out_file'].flush()
+            writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i)
+            writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i)
+            writer.add_scalar("validation transfer loss", transfer_loss.data.cpu().float().item(), i)
+            writer.add_scalar("validation total fisher loss", fisher_loss.data.cpu().float().item(), i)
+            writer.add_scalar("validation intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i)
+            writer.add_scalar("validation inter fisher", fisher_inter_loss.data.cpu().float().item(), i)
             
     return best_acc
 
