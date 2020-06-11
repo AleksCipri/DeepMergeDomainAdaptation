@@ -174,9 +174,8 @@ def image_classification_test(loader, dictionary_val, model, gpu=True):
     #print(all_output.shape)
     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).float() / float(all_label.size()[0])
     conf_matrix = confusion_matrix(all_label.cpu().numpy(), predict.cpu().numpy())
-    print(accuracy)
+    #print(accuracy)
     return accuracy, conf_matrix
-
 
 def image_classification_predict(loader, dictionary_val, model, gpu=True, softmax_param=1.0):
     start_test = True
