@@ -34,48 +34,48 @@ class SilenceLayer(torch.autograd.Function):
     return 0 * gradOutput
 
 
-# convnet without the last layer
-class AlexNetFc(nn.Module):
-  def __init__(self, use_bottleneck=True, bottleneck_dim=256, new_cls=False, class_num=1000):
-    super(AlexNetFc, self).__init__()
-    model_alexnet = models.alexnet(pretrained=True)
-    self.features = model_alexnet.features
-    self.classifier = nn.Sequential()
-    for i in range(6):
-      self.classifier.add_module("classifier"+str(i), model_alexnet.classifier[i])
-    self.feature_layers = nn.Sequential(self.features, self.classifier)
+# # convnet without the last layer
+# class AlexNetFc(nn.Module):
+#   def __init__(self, use_bottleneck=True, bottleneck_dim=256, new_cls=False, class_num=1000):
+#     super(AlexNetFc, self).__init__()
+#     model_alexnet = models.alexnet(pretrained=True)
+#     self.features = model_alexnet.features
+#     self.classifier = nn.Sequential()
+#     for i in range(6):
+#       self.classifier.add_module("classifier"+str(i), model_alexnet.classifier[i])
+#     self.feature_layers = nn.Sequential(self.features, self.classifier)
 
-    self.use_bottleneck = use_bottleneck
-    self.new_cls = new_cls
-    if new_cls:
-        if self.use_bottleneck:
-            self.bottleneck = nn.Linear(4096, bottleneck_dim)
-            self.bottleneck.weight.data.normal_(0, 0.005)
-            self.bottleneck.bias.data.fill_(0.0)
-            self.fc = nn.Linear(bottleneck_dim, class_num)
-            self.fc.weight.data.normal_(0, 0.01)
-            self.fc.bias.data.fill_(0.0)
-            self.__in_features = bottleneck_dim
-        else:
-            self.fc = nn.Linear(4096, class_num)
-            self.fc.weight.data.normal_(0, 0.01)
-            self.fc.bias.data.fill_(0.0)
-            self.__in_features = 4096
-    else:
-        self.fc = model_alexnet.classifier[6]
-        self.__in_features = 4096
+#     self.use_bottleneck = use_bottleneck
+#     self.new_cls = new_cls
+#     if new_cls:
+#         if self.use_bottleneck:
+#             self.bottleneck = nn.Linear(4096, bottleneck_dim)
+#             self.bottleneck.weight.data.normal_(0, 0.005)
+#             self.bottleneck.bias.data.fill_(0.0)
+#             self.fc = nn.Linear(bottleneck_dim, class_num)
+#             self.fc.weight.data.normal_(0, 0.01)
+#             self.fc.bias.data.fill_(0.0)
+#             self.__in_features = bottleneck_dim
+#         else:
+#             self.fc = nn.Linear(4096, class_num)
+#             self.fc.weight.data.normal_(0, 0.01)
+#             self.fc.bias.data.fill_(0.0)
+#             self.__in_features = 4096
+#     else:
+#         self.fc = model_alexnet.classifier[6]
+#         self.__in_features = 4096
 
-  def forward(self, x):
-    x = self.features(x)
-    x = x.view(x.size(0), -1)
-    x = self.classifier(x)
-    if self.use_bottleneck and self.new_cls:
-        x = self.bottleneck(x)
-    y = self.fc(x)
-    return x, y
+#   def forward(self, x):
+#     x = self.features(x)
+#     x = x.view(x.size(0), -1)
+#     x = self.classifier(x)
+#     if self.use_bottleneck and self.new_cls:
+#         x = self.bottleneck(x)
+#     y = self.fc(x)
+#     return x, y
 
-  def output_num(self):
-    return self.__in_features
+#   def output_num(self):
+#     return self.__in_features
 
 
 resnet_dict = {"ResNet18":models.resnet18, "ResNet34":models.resnet34, "ResNet50":models.resnet50, "ResNet101":models.resnet101, "ResNet152":models.resnet152}
@@ -128,48 +128,48 @@ class ResNetFc(nn.Module):
     return self.__in_features
 
 
-vgg_dict = {"VGG11":models.vgg11, "VGG13":models.vgg13, "VGG16":models.vgg16, "VGG19":models.vgg19, "VGG11BN":models.vgg11_bn, "VGG13BN":models.vgg13_bn, "VGG16BN":models.vgg16_bn, "VGG19BN":models.vgg19_bn} 
-class VGGFc(nn.Module):
-  def __init__(self, vgg_name, use_bottleneck=True, bottleneck_dim=256, new_cls=False, class_num=1000):
-    super(VGGFc, self).__init__()
-    model_vgg = vgg_dict[vgg_name](pretrained=True)
-    self.features = model_vgg.features
-    self.classifier = nn.Sequential()
-    for i in range(6):
-        self.classifier.add_module("classifier"+str(i), model_vgg.classifier[i])
-    self.feature_layers = nn.Sequential(self.features, self.classifier)
+# vgg_dict = {"VGG11":models.vgg11, "VGG13":models.vgg13, "VGG16":models.vgg16, "VGG19":models.vgg19, "VGG11BN":models.vgg11_bn, "VGG13BN":models.vgg13_bn, "VGG16BN":models.vgg16_bn, "VGG19BN":models.vgg19_bn} 
+# class VGGFc(nn.Module):
+#   def __init__(self, vgg_name, use_bottleneck=True, bottleneck_dim=256, new_cls=False, class_num=1000):
+#     super(VGGFc, self).__init__()
+#     model_vgg = vgg_dict[vgg_name](pretrained=True)
+#     self.features = model_vgg.features
+#     self.classifier = nn.Sequential()
+#     for i in range(6):
+#         self.classifier.add_module("classifier"+str(i), model_vgg.classifier[i])
+#     self.feature_layers = nn.Sequential(self.features, self.classifier)
 
-    self.use_bottleneck = use_bottleneck
-    self.new_cls = new_cls
-    if new_cls:
-        if self.use_bottleneck:
-            self.bottleneck = nn.Linear(4096, bottleneck_dim)
-            self.bottleneck.weight.data.normal_(0, 0.005)
-            self.bottleneck.bias.data.fill_(0.0)
-            self.fc = nn.Linear(bottleneck_dim, class_num)
-            self.fc.weight.data.normal_(0, 0.01)
-            self.fc.bias.data.fill_(0.0)
-            self.__in_features = bottleneck_dim
-        else:
-            self.fc = nn.Linear(4096, class_num)
-            self.fc.weight.data.normal_(0, 0.01)
-            self.fc.bias.data.fill_(0.0)
-            self.__in_features = 4096
-    else:
-        self.fc = model_vgg.classifier[6]
-        self.__in_features = 4096
+#     self.use_bottleneck = use_bottleneck
+#     self.new_cls = new_cls
+#     if new_cls:
+#         if self.use_bottleneck:
+#             self.bottleneck = nn.Linear(4096, bottleneck_dim)
+#             self.bottleneck.weight.data.normal_(0, 0.005)
+#             self.bottleneck.bias.data.fill_(0.0)
+#             self.fc = nn.Linear(bottleneck_dim, class_num)
+#             self.fc.weight.data.normal_(0, 0.01)
+#             self.fc.bias.data.fill_(0.0)
+#             self.__in_features = bottleneck_dim
+#         else:
+#             self.fc = nn.Linear(4096, class_num)
+#             self.fc.weight.data.normal_(0, 0.01)
+#             self.fc.bias.data.fill_(0.0)
+#             self.__in_features = 4096
+#     else:
+#         self.fc = model_vgg.classifier[6]
+#         self.__in_features = 4096
 
-  def forward(self, x):
-    x = self.features(x)
-    x = x.view(x.size(0), 25088)
-    x = self.classifier(x)
-    if self.use_bottleneck and self.new_cls:
-        x = self.bottleneck(x)
-    y = self.fc(x)
-    return x, y
+#   def forward(self, x):
+#     x = self.features(x)
+#     x = x.view(x.size(0), 25088)
+#     x = self.classifier(x)
+#     if self.use_bottleneck and self.new_cls:
+#         x = self.bottleneck(x)
+#     y = self.fc(x)
+#     return x, y
 
-  def output_num(self):
-    return self.__in_features
+#   def output_num(self):
+#     return self.__in_features
 
 
 class AdversarialNetwork(nn.Module):
@@ -256,3 +256,48 @@ class LittleAdversarialNetwork(nn.Module):
 def clones(module, N):
     "Produce N identical layers."
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
+
+
+class DeepMerge(nn.Module):   
+    def __init__(self, bottleneck_dim, class_num, use_bottleneck=False, new_cls=False):
+        super(DeepMerge, self).__init__()
+
+        self.class_num = class_num
+        self.cnn_layers = nn.Sequential(
+            # Defining a 2D convolution layer
+            nn.Conv2d(3, 8, kernel_size=5, stride=1, padding=2),
+            nn.BatchNorm2d(8),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout(0.5),
+            # Defining another 2D convolution layer
+            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout(0.5),
+            # Defining another 2D convolution layer
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout(0.5),
+        )
+
+        self.linear_layers = nn.Sequential(
+            nn.Linear(32 * 9 * 9, 64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 32),
+            nn.ReLU(inplace=True),
+            nn.Linear(32, class_num)
+        )
+
+    # Defining the forward pass    
+    def forward(self, x):
+        x = self.cnn_layers(x)
+        x = x.view(x.size(0), -1)
+        x = self.linear_layers(x)
+        return x
+    
+    def output_num(self):
+        return 2
