@@ -288,18 +288,21 @@ if __name__ == "__main__":
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
 
-    config["prep"] = {"test_10crop":False, "resize_size":256, "crop_size":224}
+    #config["prep"] = {"test_10crop":False, "resize_size":256, "crop_size":224}
     config["loss"] = {"trade_off":1.0, "update_iter":500}
-    if "AlexNet" in args.net:
-        config["network"] = {"name":network.AlexNetFc, \
-            "params":{"use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
+    if "DeepMerge" in args.net:
+        config["network"] = {"name":network.DeepMerge, \
+            "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
+    #if "AlexNet" in args.net:
+    #    config["network"] = {"name":network.AlexNetFc, \
+    #        "params":{"use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
     elif "ResNet" in args.net:
         network_class = network.ResNetFc
         config["network"] = {"name":network_class, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
-    elif "VGG" in args.net:
-        config["network"] = {"name":network.VGGFc, \
-            "params":{"vgg_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
+    #elif "VGG" in args.net:
+    #    config["network"] = {"name":network.VGGFc, \
+    #        "params":{"vgg_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
     config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
                            "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
                            "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
