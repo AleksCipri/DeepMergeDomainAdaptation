@@ -6,29 +6,28 @@ nohup python2 train_pada.py --gpu_id 1 --net ResNet50 --dset office --s_dset_pat
 import argparse
 import os
 import os.path as osp
-
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import tensorboardX
-from tensorboardX import SummaryWriter
 import network
 import loss
+import lr_schedule
+import torchvision.transforms as transform
+
+from tensorboardX import SummaryWriter
 # import pre_process as prep
 #import torch.utils.data as util_data
 from torch.utils.data import Dataset, TensorDataset, DataLoader
-import lr_schedule
 # import data_list
 # from data_list import ImageList, stratify_sampling
 from torch.autograd import Variable
 # import random
-import torchvision.transforms as transform
-
 from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy
 from import_and_normalize import array_to_tensor, update
 
-optim_dict = {"SGD": optim.SGD}
+optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
 #import the preprocessed tensors
 
@@ -300,14 +299,18 @@ def train(config):
                                                                                intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
         # entropy minimization loss
         em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
+
+        total_loss = loss_params["trade_off"] * transfer_loss \
+             + fisher_loss \
+             + loss_params["em_loss_coef"] * em_loss \
+             + classifier_loss
         
         # final loss
-        total_loss = loss_params["trade_off"] * transfer_loss \
-                     + fisher_loss \
-                     + loss_params["em_loss_coef"] * em_loss \
-                     + classifier_loss
-        total_loss.backward()
-        
+        if config["domain_adapt"] == 'False':
+            classifier_loss.backward() #we need to fix this
+        else:
+            total_loss.backward()
+
         if center_grad is not None:
             # clear mmc_loss
             center_criterion.centers.grad.zero_()
@@ -317,10 +320,10 @@ def train(config):
         optimizer.step()
 
         if i % config["log_iter"] == 0:
-            config['out_file'].write('iter {} train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
+            config['out_file'].write('iter {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
                 'train entropy min loss={:0.4f}, '
                 'train fisher loss={:0.4f}, train intra-group fisher loss={:0.4f}, train inter-group fisher loss={:0.4f}\n'.format(
-                i, transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
+                i, total_loss.data.cpu(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
                 em_loss.data.cpu().float().item(), 
                 fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
                 ))
@@ -330,7 +333,7 @@ def train(config):
             writer.add_scalar("training transfer loss", transfer_loss.data.cpu().float().item(), i)
             writer.add_scalar("training total fisher loss", fisher_loss.data.cpu().float().item(), i)
             writer.add_scalar("training intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i)
-            writer.add_scalar("training inter fisher", fisher_inter_loss.data.cpu().float().item(), i)
+            writer.add_scalar("training inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i)
 
         #attempted validation step
         #if i < len_valid_source:
@@ -399,7 +402,7 @@ def train(config):
             writer.add_scalar("validation transfer loss", transfer_loss.data.cpu().float().item(), i)
             writer.add_scalar("validation total fisher loss", fisher_loss.data.cpu().float().item(), i)
             writer.add_scalar("validation intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i)
-            writer.add_scalar("validation inter fisher", fisher_inter_loss.data.cpu().float().item(), i)
+            writer.add_scalar("validation inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i)
             
     return best_acc
 
@@ -427,6 +430,8 @@ if __name__ == "__main__":
     parser.add_argument('--test_interval', type=int, default=500, help="interval of two continuous test phase")
     parser.add_argument('--snapshot_interval', type=int, default=5000, help="interval of two continuous output model")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
+    parser.add_argument('--domain_adapt', type=str, default='True', help='domain adaptation = True or no domain adaptation = False')
+    parser.add_argument('--optim_choice', type=str, default='SGD', help='Adam or SGD')
     # parser.add_argument('--note', type=str, help="description of the experiment. ")
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -442,12 +447,19 @@ if __name__ == "__main__":
     config["output_path"] = args.output_dir
     config["log_iter"] = 100
     config["early_stop_patience"] = 10
+    config["domain_adapt"] = args.domain_adapt
+    config["optim_choice"] = args.optim_choice
 
     if not osp.exists(config["output_path"]):
-        os.makedirs(config["output_path"])
-    config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
-    if not osp.exists(config["output_path"]):
-        os.makedirs(config["output_path"])
+        # os.makedirs(config["output_path"])
+        os.makedirs(osp.join(config["output_path"]))
+        config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
+    else:
+        config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
+
+    # if not osp.exists(config["output_path"]):
+    #     now = datetime.now()
+    #     os.makedirs(osp.join(config["output_path"], now.strftime("%Y%m%d-%H%M%S"), ""))
 
     # config["prep"] = {#"test_10crop":True, "resize_size":256, "crop_size":224, #don't want to crop or resize
     #                   "source_size": args.source_size, "target_size": args.target_size}
@@ -474,9 +486,14 @@ if __name__ == "__main__":
     elif "VGG" in args.net:
         config["network"] = {"name":network.VGGFc, \
             "params":{"vgg_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
-    config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
-                           "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
-                           "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
+    
+    if config["optim_choice"] == 'Adam':
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.0005, "amsgrad":False, "eps":1e-8}, \
+                        "lr_type":"inv", "lr_param":{"init_lr":0.000025, "gamma":0.001, "power":0.75} }
+    else:
+        config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
+                               "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
+                               "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
 
     if args.lr is not None:
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
