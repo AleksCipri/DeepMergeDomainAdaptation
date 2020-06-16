@@ -6,29 +6,28 @@ nohup python2 train_pada.py --gpu_id 1 --net ResNet50 --dset office --s_dset_pat
 import argparse
 import os
 import os.path as osp
-
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import tensorboardX
-from tensorboardX import SummaryWriter
 import network
 import loss
+import lr_schedule
+import torchvision.transforms as transform
+
+from tensorboardX import SummaryWriter
 # import pre_process as prep
 #import torch.utils.data as util_data
 from torch.utils.data import Dataset, TensorDataset, DataLoader
-import lr_schedule
 # import data_list
 # from data_list import ImageList, stratify_sampling
 from torch.autograd import Variable
 # import random
-import torchvision.transforms as transform
-
 from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy
 from import_and_normalize import array_to_tensor, update
 
-optim_dict = {"SGD": optim.SGD}
+optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
 #import the preprocessed tensors
 
@@ -39,23 +38,6 @@ def train(config):
     # set up early stop
     early_stop_engine = EarlyStopping(config["early_stop_patience"])
 
-    ## set pre-process
-    # prep_dict = {}
-    # prep_config = config["prep"]
-    # prep_dict["source"] = prep.image_train( \
-    #                         resize_size=prep_config["resize_size"], \
-    #                         crop_size=prep_config["crop_size"])
-    # prep_dict["target"] = prep.image_train( \
-    #                         resize_size=prep_config["resize_size"], \
-    #                         crop_size=prep_config["crop_size"])
-    # if prep_config["test_10crop"]:
-    #     prep_dict["test"] = prep.image_test_10crop( \
-    #                         resize_size=prep_config["resize_size"], \
-    #                         crop_size=prep_config["crop_size"])
-    # else:
-    #     prep_dict["test"] = prep.image_test( \
-    #                         resize_size=prep_config["resize_size"], \
-    #                         crop_size=prep_config["crop_size"])
                
     ## set loss
     class_num = config["network"]["params"]["class_num"]
@@ -105,9 +87,6 @@ def train(config):
     dsets["target_test"] = TensorDataset(noisy_x_test, noisy_y_test)
 
 
-    # data_config = config["data"]
-    # dsets["source"] = ImageList(stratify_sampling(open(data_config["source"]["list_path"]).readlines(), ratio=prep_config["source_size"]), \
-    #                             transform=prep_dict["source"])
 
     #put your dataloaders here
     #i stole batch size numbers from below
@@ -121,45 +100,10 @@ def train(config):
     dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 4, shuffle = True, num_workers = 1)
     dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 4, shuffle = True, num_workers = 1)
 
-    # dset_loaders["source"] = DataLoader(dsets["source"], \
-    #         batch_size=data_config["source"]["batch_size"], \
-    #         shuffle=True, num_workers=1) 
-    # dsets["target"] = ImageList(stratify_sampling(open(data_config["target"]["list_path"]).readlines(), ratio=prep_config['target_size']), \
-    #                             transform=prep_dict["target"])
-    # dset_loaders["target"] = DataLoader(dsets["target"], \
-    #         batch_size=data_config["target"]["batch_size"], \
-    #         shuffle=True, num_workers=1)
-
-    # if prep_config["test_10crop"]: #set to false! or prevent from test_10_crop in some way
-    #     for i in range(10):
-    #         dsets["test"+str(i)] = ImageList(stratify_sampling(open(data_config["test"]["list_path"]).readlines(), ratio=prep_config['target_size']), \
-    #                             transform=prep_dict["test"]["val"+str(i)])
-    #         dset_loaders["test"+str(i)] = util_data.DataLoader(dsets["test"+str(i)], \
-    #                             batch_size=data_config["test"]["batch_size"], \
-    #                             shuffle=False, num_workers=1)
-
-    #         dsets["target"+str(i)] = ImageList(stratify_sampling(open(data_config["target"]["list_path"]).readlines(), ratio=prep_config['target_size']), \
-    #                             transform=prep_dict["test"]["val"+str(i)])
-    #         dset_loaders["target"+str(i)] = util_data.DataLoader(dsets["target"+str(i)], \
-    #                             batch_size=data_config["test"]["batch_size"], \
-    #                             shuffle=False, num_workers=1)
-    # else:
-    #data loaders here
-
-        # dsets["test"] = ImageList(stratify_sampling(open(data_config["test"]["list_path"]).readlines(), ratio=prep_config['target_size']), \
-        #                         transform=prep_dict["test"])
-    # dset_loaders["test"] = DataLoader(dsets["test"], \
-    #                         batch_size=data_config["test"]["batch_size"], \
-    #                         shuffle=False, num_workers=1)
-
-        # dsets["target_test"] = ImageList(stratify_sampling(open(data_config["target"]["list_path"]).readlines(), ratio=prep_config['target_size']), \
-    #     #                         transform=prep_dict["test"])
-    # dset_loaders["target_test"] = MyDataLoader(dsets["target_test"], \
-    #                         batch_size=data_config["test"]["batch_size"], \
-    #                         shuffle=False, num_workers=1)
 
     config['out_file'].write("dataset sizes: source={}, target={}\n".format(
         len(dsets["source"]), len(dsets["target"]))) #TODO: change this too
+
 
     ## set base network
     net_config = config["network"]
@@ -169,6 +113,7 @@ def train(config):
     use_gpu = torch.cuda.is_available()
     if use_gpu:
         base_network = base_network.cuda()
+
 
     ## collect parameters
     if "DeepMerge" in args.net:
@@ -180,7 +125,7 @@ def train(config):
                             {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
         else:
             parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-                                {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
+                            {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
     else:
         parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
 
@@ -302,14 +247,18 @@ def train(config):
                                                                                intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
         # entropy minimization loss
         em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
+
+        total_loss = loss_params["trade_off"] * transfer_loss \
+             + fisher_loss \
+             + loss_params["em_loss_coef"] * em_loss \
+             + classifier_loss
         
         # final loss
-        total_loss = loss_params["trade_off"] * transfer_loss \
-                     + fisher_loss \
-                     + loss_params["em_loss_coef"] * em_loss \
-                     + classifier_loss
-        total_loss.backward()
-        
+        if config["domain_adapt"] == 'False':
+            classifier_loss.backward() #we need to fix this
+        else:
+            total_loss.backward()
+
         if center_grad is not None:
             # clear mmc_loss
             center_criterion.centers.grad.zero_()
@@ -319,20 +268,21 @@ def train(config):
         optimizer.step()
 
         if i % config["log_iter"] == 0:
-            config['out_file'].write('iter {} train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
+            config['out_file'].write('iter {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
                 'train entropy min loss={:0.4f}, '
                 'train fisher loss={:0.4f}, train intra-group fisher loss={:0.4f}, train inter-group fisher loss={:0.4f}\n'.format(
-                i, transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
+                i, total_loss.data.cpu(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
                 em_loss.data.cpu().float().item(), 
                 fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
                 ))
             config['out_file'].flush()
             writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i)
-            writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i)
             writer.add_scalar("training transfer loss", transfer_loss.data.cpu().float().item(), i)
+            writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i)
+            writer.add_scalar("training entropy minimization loss", em_loss.data.cpu().float().item(), i)
             writer.add_scalar("training total fisher loss", fisher_loss.data.cpu().float().item(), i)
             writer.add_scalar("training intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i)
-            writer.add_scalar("training inter fisher", fisher_inter_loss.data.cpu().float().item(), i)
+            writer.add_scalar("training inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i)
 
         #attempted validation step
         #if i < len_valid_source:
@@ -397,11 +347,12 @@ def train(config):
                 ))
             config['out_file'].flush()
             writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i)
-            writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i)
             writer.add_scalar("validation transfer loss", transfer_loss.data.cpu().float().item(), i)
+            writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i)
+            writer.add_scalar("validation entropy minimization loss", em_loss.data.cpu().float().item(), i)
             writer.add_scalar("validation total fisher loss", fisher_loss.data.cpu().float().item(), i)
             writer.add_scalar("validation intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i)
-            writer.add_scalar("validation inter fisher", fisher_inter_loss.data.cpu().float().item(), i)
+            writer.add_scalar("validation inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i)
             
     return best_acc
 
@@ -429,7 +380,8 @@ if __name__ == "__main__":
     parser.add_argument('--test_interval', type=int, default=500, help="interval of two continuous test phase")
     parser.add_argument('--snapshot_interval', type=int, default=5000, help="interval of two continuous output model")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
-    # parser.add_argument('--note', type=str, help="description of the experiment. ")
+    parser.add_argument('--domain_adapt', type=str, default='True', help='domain adaptation = True or no domain adaptation = False')
+    parser.add_argument('--optim_choice', type=str, default='SGD', help='Adam or SGD')
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
@@ -437,19 +389,25 @@ if __name__ == "__main__":
     config = {}
     config["high"] = 1.0 #should this maybe be .5? the other data ranged from .25 to .5
     config["num_iterations"] = 12004
-    # config["num_iterations"] = 1 # debug
     config["test_interval"] = args.test_interval
     config["snapshot_interval"] = args.snapshot_interval
     config["output_for_test"] = True
     config["output_path"] = args.output_dir
     config["log_iter"] = 100
     config["early_stop_patience"] = 10
+    config["domain_adapt"] = args.domain_adapt
+    config["optim_choice"] = args.optim_choice
 
     if not osp.exists(config["output_path"]):
-        os.makedirs(config["output_path"])
-    config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
-    if not osp.exists(config["output_path"]):
-        os.makedirs(config["output_path"])
+        # os.makedirs(config["output_path"])
+        os.makedirs(osp.join(config["output_path"]))
+        config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
+    else:
+        config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
+
+    # if not osp.exists(config["output_path"]):
+    #     now = datetime.now()
+    #     os.makedirs(osp.join(config["output_path"], now.strftime("%Y%m%d-%H%M%S"), ""))
 
     # config["prep"] = {#"test_10crop":True, "resize_size":256, "crop_size":224, #don't want to crop or resize
     #                   "source_size": args.source_size, "target_size": args.target_size}
@@ -470,18 +428,18 @@ if __name__ == "__main__":
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
-    #elif "AlexNet" in args.net:
-    #    config["network"] = {"name":network.AlexNetFc, \
-    #        "params":{"use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
     elif "ResNet" in args.net:
         config["network"] = {"name":network.ResNetFc, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
-    #elif "VGG" in args.net:
-    #    config["network"] = {"name":network.VGGFc, \
-    #        "params":{"vgg_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
-    config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
-                           "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
-                           "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
+    
+
+    if config["optim_choice"] == 'Adam':
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.0005, "amsgrad":False, "eps":1e-8}, \
+                        "lr_type":"inv", "lr_param":{"init_lr":0.000025, "gamma":0.001, "power":0.75} }
+    else:
+        config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
+                               "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
+                               "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
 
     if args.lr is not None:
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
@@ -501,52 +459,10 @@ if __name__ == "__main__":
 
         config["network"]["params"]["class_num"] = 2
 
-    # if config["dataset"] == "office":
-    #     config["early_stop_patience"] = 5
-    #     config["data"] = {"source":{"list_path":args.s_dset_path, "batch_size":36}, \
-    #                       "target":{"list_path":args.t_dset_path, "batch_size":36}, \
-    #                       "test":{"list_path":args.t_dset_path, "batch_size":4}}
-    #     if "amazon" in config["data"]["test"]["list_path"]:
-    #         config["test_interval"] = 200
-    #         config["early_stop_patience"] = 10
-    #     if args.lr is None:
-    #         if "amazon" in config["data"]["test"]["list_path"]:
-    #             config["optimizer"]["lr_param"]["init_lr"] = 0.0003
-    #         else:
-    #             config["optimizer"]["lr_param"]["init_lr"] = 0.001
-    #     config["network"]["params"]["class_num"] = 31
-    # elif config["dataset"] == "office-home":
-    #     config["num_iterations"] = 25004
-    #     config["early_stop_patience"] = 5
-    #     config["data"] = {"source":{"list_path":args.s_dset_path, "batch_size":36}, \
-    #                       "target":{"list_path":args.t_dset_path, "batch_size":36}, \
-    #                       "test":{"list_path":args.t_dset_path, "batch_size":4}}
-    #     config["network"]["params"]["class_num"] = 65
-    #     if "Real_World" in args.s_dset_path and "Art" in args.t_dset_path:
-    #         if args.lr is None:
-    #             config["optimizer"]["lr_param"]["init_lr"] = 0.0003
-    #     elif "Clipart" in args.s_dset_path and "Art" in args.t_dset_path:
-    #         config["loss"]["em_loss_coef"] = 0.
-    #     elif "Real_World" in args.s_dset_path:
-    #         if args.lr is None:
-    #             config["optimizer"]["lr_param"]["init_lr"] = 0.001
-    #     elif "Art" in args.s_dset_path:
-    #         if args.lr is None:
-    #             config["optimizer"]["lr_param"]["init_lr"] = 0.0003
-    #         config["high"] = 0.5
-    #         if "Real_World" in args.t_dset_path:
-    #             config["high"] = 0.25
-    #     elif "Product" in args.s_dset_path:
-    #         if args.lr is None:
-    #             config["optimizer"]["lr_param"]["init_lr"] = 0.0003
-    #         config["high"] = 0.5
-    #         if "Real_World" in args.t_dset_path:
-    #             config["high"] = 0.3
-        #else:
+    
     if args.lr is None: #i deleted a tab here
         config["optimizer"]["lr_param"]["init_lr"] = 0.0003
-            # if "Real_World" in args.t_dset_path:
-            #     config["high"] = 0.5
+            
     else:
          raise ValueError('{} cannot be found. ')
         #raise ValueError('{} cannot be found. '.format(config["dataset"]))
