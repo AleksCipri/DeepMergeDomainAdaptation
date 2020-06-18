@@ -111,31 +111,39 @@ def test(config):
     print("start test: ")
     base_network.train(False)
     if config["ly_type"] == 'cosine':
-        test_acc, test_confusion_matrix = image_classification_test(dset_loaders, str(config["domain"]), \
+        source_test_acc, source_test_confusion_matrix = image_classification_test(dset_loaders, "source_test", \
             base_network, \
             gpu=use_gpu)
+        target_test_acc, target_test_confusion_matrix = image_classification_test(dset_loaders, "target_test", \
+            base_network, \
+            gpu=use_gpu)
+
     elif config["ly_type"] == "euclidean":
         eval_centroids = None
         if centroids is not None:
             eval_centroids = centroids
         if target_centroids is not None:
             eval_centroids = target_centroids
-        test_acc, test_confusion_matrix = distance_classification_test(dset_loaders, str(config["domain"]), \
+        source_test_acc, source_test_confusion_matrix = distance_classification_test(dset_loaders, "source_test", \
+            base_network, eval_centroids, \
+            gpu=use_gpu)
+        target_test_acc, target_test_confusion_matrix = distance_classification_test(dset_loaders, "target_test", \
             base_network, eval_centroids, \
             gpu=use_gpu)
 
     # save train/test accuracy as pkl file
+    #why do we want this in a pkl file?
     with open(os.path.join(config["output_path"], 'accuracy.pkl'), 'wb') as pkl_file:
-        pkl.dump({'train': train_accuracy, 'valid': valid_accuracy, 'test': test_acc}, pkl_file)
+        pkl.dump({'train': train_accuracy, 'valid': valid_accuracy, 'source test': source_test_acc, 'target test': target_test_acc}, pkl_file)
     
     np.set_printoptions(precision=2)
-    log_str = "train accuracy: {:.5f}\tvalid accuracy: {:5f}\ttest accuracy: {:.5f}\nconfusion matrix:\n{}\n".format(
-        train_accuracy, valid_accuracy, test_acc, test_confusion_matrix)
+    log_str = "train accuracy: {:.5f}\tvalid accuracy: {:5f}\nsource test accuracy: {:.5f}\nsource confusion matrix:\n{}\ntarget test accuracy: {:.5f}\ntarget confusion matrix:\n{}\n".format(
+        train_accuracy, valid_accuracy, source_test_acc, source_test_confusion_matrix, target_test_acc, target_test_confusion_matrix)
     config["out_file"].write(log_str)
     config["out_file"].flush()
     print(log_str)
 
-    return test_acc
+    return (source_test_acc, target_test_acc)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Evaluate DA models.')
@@ -144,7 +152,7 @@ if __name__ == "__main__":
     parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
     parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path list")
-    parser.add_argument('--domain', type=str, default='source_test', help="Either source_test or target_test")
+    #parser.add_argument('--domain', type=str, default='source_test', help="Either source_test or target_test")
     parser.add_argument('--ckpt_path', type=str, required=True, help="path to load ckpt")
     args = parser.parse_args()
 
@@ -176,7 +184,7 @@ if __name__ == "__main__":
 
     config["dataset"] = args.dset
     config["path"] = args.dset_path
-    config["domain"] = args.domain
+    #config["domain"] = args.domain
 
     if config["dataset"] == 'galaxy': 
         pristine_x = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy'))
