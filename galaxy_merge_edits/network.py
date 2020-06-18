@@ -8,21 +8,31 @@ from torchvision import models
 from torch.autograd import Variable
 
 class AdversarialLayer(torch.autograd.Function):
-  def __init__(self, high_value=1.0, max_iter_value=10000.0):
-    self.iter_num = 0
-    self.alpha = 10
-    self.low = 0.0
-    self.high = high_value
-    self.max_iter = max_iter_value
-    
-  def forward(self, input):
-    self.iter_num += 1
+  # def __init__(self, high_value=1.0, max_iter_value=10000.0):
+  #   self.iter_num = 0
+  #   self.alpha = 10
+  #   self.low = 0.0
+  #   self.high = high_value
+  #   self.max_iter = max_iter_value
+  
+  @staticmethod  
+  #def forward(self, input):
+  def forward(ctx, input, iter_num=0, alpha=10, low=0.0, high=1.0, max_iter=10000.0):
+    iter_num += 1
+    ctx.save_for_backward(input) 
+    ctx.intermediate_results = (iter_num, alpha, low, high, max_iter)
+    #self.save_for_backward(self.iter_num)
     output = input * 1.0
     return output
 
-  def backward(self, gradOutput):
-    self.coeff = np.float(2.0 * (self.high - self.low) / (1.0 + np.exp(-self.alpha*self.iter_num / self.max_iter)) - (self.high - self.low) + self.low)
-    return -self.coeff * gradOutput
+  @staticmethod 
+  def backward(ctx, gradOutput):
+    input = ctx.saved_tensors
+    iter_num, alpha, low, high, max_iter = ctx.intermediate_results
+    #self.iter_,num += 1
+    # self.coeff = np.float(2.0 * (self.high - self.low) / (1.0 + np.exp(-self.alpha*self.iter_num / self.max_iter)) - (self.high - self.low) + self.low)
+    coeff = np.float(2.0 * (high - low) / (1.0 + np.exp(-alpha*iter_num / max_iter)) - (high - low) + low)
+    return -coeff * gradOutput
 
 class SilenceLayer(torch.autograd.Function):
   def __init__(self):
@@ -74,7 +84,7 @@ class ResNetFc(nn.Module):
     else:
         self.fc = model_resnet.fc
         self.__in_features = model_resnet.fc.in_features
-
+      
   def forward(self, x):
     x = self.feature_layers(x)
     x = x.view(x.size(0), -1)
@@ -85,8 +95,6 @@ class ResNetFc(nn.Module):
 
   def output_num(self):
     return self.__in_features
-
-
 
 
 class DeepMerge(nn.Module):   

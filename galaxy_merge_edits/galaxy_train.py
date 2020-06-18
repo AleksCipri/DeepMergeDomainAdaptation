@@ -17,13 +17,8 @@ import lr_schedule
 import torchvision.transforms as transform
 
 from tensorboardX import SummaryWriter
-# import pre_process as prep
-#import torch.utils.data as util_data
 from torch.utils.data import Dataset, TensorDataset, DataLoader
-# import data_list
-# from data_list import ImageList, stratify_sampling
 from torch.autograd import Variable
-# import random
 from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy
 from import_and_normalize import array_to_tensor, update
 
@@ -37,8 +32,7 @@ def train(config):
 
     # set up early stop
     early_stop_engine = EarlyStopping(config["early_stop_patience"])
-
-               
+             
     ## set loss
     class_num = config["network"]["params"]["class_num"]
 
@@ -85,8 +79,6 @@ def train(config):
 
     dsets["source_test"] = TensorDataset(pristine_x_test, pristine_y_test)
     dsets["target_test"] = TensorDataset(noisy_x_test, noisy_y_test)
-
-
 
     #put your dataloaders here
     #i stole batch size numbers from below
@@ -195,7 +187,6 @@ def train(config):
             if early_stop_engine.is_stop_training(temp_acc):
                 config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
                     config["early_stop_patience"], i))
-                # config["out_file"].write("finish training! \n")
                 break
 
         if (i+1) % config["snapshot_interval"] == 0:
@@ -285,7 +276,6 @@ def train(config):
             writer.add_scalar("training inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i)
 
         #attempted validation step
-        #if i < len_valid_source:
         base_network.eval()
         with torch.no_grad():
             if i % len_valid_source == 0:
@@ -376,11 +366,9 @@ if __name__ == "__main__":
     parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
     parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
-    #parser.add_argument('--t_dset_path', type=str, default='../data/office/webcam_10_list.txt', help="The target dataset path list")
     parser.add_argument('--test_interval', type=int, default=500, help="interval of two continuous test phase")
     parser.add_argument('--snapshot_interval', type=int, default=5000, help="interval of two continuous output model")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
-    parser.add_argument('--domain_adapt', type=str, default='True', help='domain adaptation = True or no domain adaptation = False')
     parser.add_argument('--optim_choice', type=str, default='SGD', help='Adam or SGD')
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -395,7 +383,6 @@ if __name__ == "__main__":
     config["output_path"] = args.output_dir
     config["log_iter"] = 100
     config["early_stop_patience"] = 10
-    config["domain_adapt"] = args.domain_adapt
     config["optim_choice"] = args.optim_choice
 
     if not osp.exists(config["output_path"]):
@@ -404,13 +391,6 @@ if __name__ == "__main__":
         config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
     else:
         config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
-
-    # if not osp.exists(config["output_path"]):
-    #     now = datetime.now()
-    #     os.makedirs(osp.join(config["output_path"], now.strftime("%Y%m%d-%H%M%S"), ""))
-
-    # config["prep"] = {#"test_10crop":True, "resize_size":256, "crop_size":224, #don't want to crop or resize
-    #                   "source_size": args.source_size, "target_size": args.target_size}
 
     # set loss
     loss_dict = {"coral":loss.CORAL, "mmd":loss.mmd_distance}
@@ -465,7 +445,6 @@ if __name__ == "__main__":
             
     else:
          raise ValueError('{} cannot be found. ')
-        #raise ValueError('{} cannot be found. '.format(config["dataset"]))
     
     config["out_file"].write("config: {}\n".format(config))
     config["out_file"].flush()
