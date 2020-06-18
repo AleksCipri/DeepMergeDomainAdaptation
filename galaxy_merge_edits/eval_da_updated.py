@@ -6,45 +6,33 @@ nohup python test_pada_py2.py --gpu_id 1 --net ResNet50 --dset office --s_dset_p
 import argparse
 import os
 import os.path as osp
-
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import network
 import loss
-#import pre_process as prep
-from galaxy_utils import image_classification_test, distance_classification_test 
-#import torch.utils.data as util_data
-#import data_list
-#from data_list import ImageList
-from torch.utils.data import Dataset, TensorDataset, DataLoader
-from torch.autograd import Variable
 import random
 import json
-from sklearn.metrics import confusion_matrix
-from import_and_normalize import array_to_tensor, update
 import pickle as pkl
-
 import galaxy_utils
-
-# visualization packages
-from sklearn.manifold import TSNE
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 
-
-optim_dict = {"SGD": optim.SGD}
-
+from galaxy_utils import image_classification_test, distance_classification_test 
+from torch.utils.data import Dataset, TensorDataset, DataLoader
+from torch.autograd import Variable
+from sklearn.manifold import TSNE
+from sklearn.metrics import confusion_matrix
+from import_and_normalize import array_to_tensor, update
 
 def test(config):
     ## prepare data
     dsets = {}
     dset_loaders = {}
-    #data_config = config["data"]
 
     #sampling WOR, i guess we leave the 10 in the middle to validate?
     pristine_indices = torch.randperm(len(pristine_x))
@@ -79,8 +67,6 @@ def test(config):
     dsets["source_test"] = TensorDataset(pristine_x_test, pristine_y_test)
     dsets["target_test"] = TensorDataset(noisy_x_test, noisy_y_test)
 
-
-
     #put your dataloaders here
     #i stole batch size numbers from below
     dset_loaders["source"] = DataLoader(dsets["source"], batch_size = 36, shuffle = True, num_workers = 1)
@@ -98,12 +84,11 @@ def test(config):
 
     # load checkpoint
     print('load model from {}'.format(config['ckpt_path']))
-    # load in an old way
-    # base_network = torch.load(config["ckpt_path"])[0]
-    # recommended practice
+
     ckpt = torch.load(config['ckpt_path'])
     print('recorded best training accuracy: {:0.4f} at step {}'.format(ckpt["train accuracy"], ckpt["step"]))
     print('recorded best validation accuracy: {:04f} at step {}'.format(ckpt["valid accuracy"], ckpt["step"]))
+
     train_accuracy = ckpt["train accuracy"]
     valid_accuracy = ckpt["valid accuracy"]
     ## set base network
@@ -152,7 +137,6 @@ def test(config):
 
     return test_acc
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Evaluate DA models.')
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
@@ -180,8 +164,8 @@ if __name__ == "__main__":
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
 
-    #config["prep"] = {"test_10crop":False, "resize_size":256, "crop_size":224}
     config["loss"] = {"trade_off":1.0, "update_iter":500}
+
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
@@ -189,11 +173,6 @@ if __name__ == "__main__":
         network_class = network.ResNetFc
         config["network"] = {"name":network_class, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
-    
-
-    #config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
-    #                       "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
-    #                       "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
 
     config["dataset"] = args.dset
     config["path"] = args.dset_path

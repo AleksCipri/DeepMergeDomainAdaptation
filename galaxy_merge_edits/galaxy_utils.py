@@ -151,7 +151,6 @@ def image_classification_test(loader, dictionary_val, model, gpu=True):
         # else:
         iter_test = iter(loader[str(dictionary_val)])
         for i in range(len(loader[str(dictionary_val)])):
-            #print(i)
             data = iter_test.next()
             inputs = data[0]
             labels = data[1]
@@ -166,15 +165,10 @@ def image_classification_test(loader, dictionary_val, model, gpu=True):
             else:
                 all_output = torch.cat((all_output, outputs.data.float()), 0)
                 all_label = torch.cat((all_label, labels.data.float()), 0)
-    
-    #print("out of for loop")   
-    #print(all_output.shape)
+
     _, predict = torch.max(all_output, 1)
-    #print(predict.shape)
-    #print(all_output.shape)
     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).float() / float(all_label.size()[0])
     conf_matrix = confusion_matrix(all_label.cpu().numpy(), predict.cpu().numpy())
-    #print(accuracy)
     return accuracy, conf_matrix
 
 def image_classification_predict(loader, dictionary_val, model, gpu=True, softmax_param=1.0):
@@ -220,111 +214,3 @@ def image_classification_predict(loader, dictionary_val, model, gpu=True, softma
         else:
             all_softmax_output = torch.cat((all_softmax_output, softmax_outputs.data.cpu().float()), 0)
     return all_softmax_output
-
-#from galaxy_train just in case!!!
-# def image_classification_test(loader, model, test_10crop=True, gpu=True, iter_num=-1):
-#     start_test = True
-#     with torch.no_grad():
-#         if test_10crop: #won't be but we will probably have to delete all this
-#             iter_test = [iter(loader['test'+str(i)]) for i in range(10)]
-#             for i in range(len(loader['test0'])):
-#                 data = [iter_test[j].next() for j in range(10)]
-#                 inputs = [data[j][0] for j in range(10)]
-#                 labels = data[0][1]
-#                 if gpu:
-#                     for j in range(10):
-#                         inputs[j] = Variable(inputs[j].cuda())
-#                     labels = Variable(labels.cuda())
-#                 else:
-#                     for j in range(10):
-#                         inputs[j] = Variable(inputs[j])
-#                     labels = Variable(labels)
-#                 outputs = []
-#                 for j in range(10):
-#                     _, predict_out = model(inputs[j])
-#                     outputs.append(nn.Softmax(dim=1)(predict_out))
-#                 outputs = sum(outputs)
-#                 if start_test:
-#                     all_output = outputs.data.float()
-#                     all_label = labels.data.float()
-#                     start_test = False
-#                 else:
-#                     all_output = torch.cat((all_output, outputs.data.float()), 0)
-#                     all_label = torch.cat((all_label, labels.data.float()), 0)
-#         else:
-#             iter_test = iter(loader["test"])
-#             for i in range(len(loader['test'])):
-#                 data = iter_test.next()
-#                 inputs = data[0]
-#                 labels = data[1]
-#                 if gpu:
-#                     inputs = Variable(inputs.cuda())
-#                     labels = Variable(labels.cuda())
-#                 else:
-#                     inputs = Variable(inputs)
-#                     labels = Variable(labels)
-#                 _, outputs = model(inputs)
-#                 if start_test:
-#                     all_output = outputs.data.float()
-#                     all_label = labels.data.float()
-#                     start_test = False
-#                 else:
-#                     all_output = torch.cat((all_output, outputs.data.float()), 0)
-#                     all_label = torch.cat((all_label, labels.data.float()), 0)       
-#     _, predict = torch.max(all_output, 1)
-#     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).float() / float(all_label.size()[0])
-#     return accuracy.item()
-
-#from adversarial training just in case
-# def image_classification_test(loader, model, test_10crop=True, gpu=True, iter_num=-1):
-#     start_test = True
-#     with torch.no_grad():
-#         if test_10crop:
-#             iter_test = [iter(loader['test'+str(i)]) for i in range(10)]
-#             for i in range(len(loader['test0'])):
-#                 data = [iter_test[j].next() for j in range(10)]
-#                 inputs = [data[j][0] for j in range(10)]
-#                 labels = data[0][1]
-#                 if gpu:
-#                     for j in range(10):
-#                         inputs[j] = Variable(inputs[j].cuda())
-#                     labels = Variable(labels.cuda())
-#                 else:
-#                     for j in range(10):
-#                         inputs[j] = Variable(inputs[j])
-#                     labels = Variable(labels)
-#                 outputs = []
-#                 for j in range(10):
-#                     _, predict_out = model(inputs[j])
-#                     outputs.append(nn.Softmax(dim=1)(predict_out))
-#                 outputs = sum(outputs)
-#                 if start_test:
-#                     all_output = outputs.data.float()
-#                     all_label = labels.data.float()
-#                     start_test = False
-#                 else:
-#                     all_output = torch.cat((all_output, outputs.data.float()), 0)
-#                     all_label = torch.cat((all_label, labels.data.float()), 0)
-#         else:
-#             iter_test = iter(loader["test"])
-#             for i in range(len(loader['test'])):
-#                 data = iter_test.next()
-#                 inputs = data[0]
-#                 labels = data[1]
-#                 if gpu:
-#                     inputs = Variable(inputs.cuda())
-#                     labels = Variable(labels.cuda())
-#                 else:
-#                     inputs = Variable(inputs)
-#                     labels = Variable(labels)
-#                 _, outputs = model(inputs)
-#                 if start_test:
-#                     all_output = outputs.data.float()
-#                     all_label = labels.data.float()
-#                     start_test = False
-#                 else:
-#                     all_output = torch.cat((all_output, outputs.data.float()), 0)
-#                     all_label = torch.cat((all_label, labels.data.float()), 0)       
-#     _, predict = torch.max(all_output, 1)
-#     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).float() / float(all_label.size()[0])
-#     return accuracy.item()

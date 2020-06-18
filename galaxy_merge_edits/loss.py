@@ -23,7 +23,7 @@ def PADA(features, ad_net, grl_layer, weight_ad, use_gpu=True):
         grl_layer: gradient reversal layer
         weight_ad: torch.FloatTensor, weight of each sample, default all 1's
     '''
-    ad_out, _ = ad_net(grl_layer(features))
+    ad_out, _ = ad_net(grl_layer.apply(features))
     batch_size = int(ad_out.size(0) / 2)
     dc_target = Variable(torch.from_numpy(
         np.array([[1]] * batch_size + [[0]] * batch_size)).float())
