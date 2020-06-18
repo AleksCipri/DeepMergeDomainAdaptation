@@ -181,23 +181,22 @@ def train(config):
         classifier_loss = class_criterion(source_logits, labels_source.long())
         
         # entropy minimization loss
-        em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
+        #em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
+        #total_loss = loss_params["em_loss_coef"] * em_loss + classifier_loss
 
-        total_loss = loss_params["em_loss_coef"] * em_loss + classifier_loss
+        total_loss = classifier_loss
    
         total_loss.backward()
 
         optimizer.step()
 
         if i % config["log_iter"] == 0:
-            config['out_file'].write('iter {}: train total loss={:0.4f}, train classifier loss={:0.4f}, '
-                'train entropy min loss={:0.4f}\n'.format(
-                i, total_loss.data.cpu(), classifier_loss.data.cpu().float().item(), em_loss.data.cpu().float().item(), 
-                ))
+            config['out_file'].write('iter {}: train total loss={:0.4f}, train classifier loss={:0.4f}\n'.format(i, \
+                total_loss.data.cpu(), classifier_loss.data.cpu().float().item(),))
             config['out_file'].flush()
             writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i)
             writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i)
-            writer.add_scalar("training entropy minimization loss", em_loss.data.cpu().float().item(), i)
+            #writer.add_scalar("training entropy minimization loss", em_loss.data.cpu().float().item(), i)
         
 
         #attempted validation step
@@ -228,21 +227,20 @@ def train(config):
             classifier_loss = class_criterion(source_logits, labels_source.long())
            
             # entropy minimization loss
-            em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
+            #em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
             
             # final loss
-            total_loss = loss_params["em_loss_coef"] * em_loss + classifier_loss
+            #total_loss = loss_params["em_loss_coef"] * em_loss + classifier_loss
+            total_loss = classifier_loss
             #total_loss.backward() no backprop on the eval mode
 
         if i % config["log_iter"] == 0:
-            config['out_file'].write('iter {}: validation total loss={:0.4f}, validation classifier loss={:0.4f}, '
-                'validation entropy min loss={:0.4f}\n'.format(
-                i, total_loss.data.cpu(), classifier_loss.data.cpu().float().item(), em_loss.data.cpu().float().item(), 
-                ))
+            config['out_file'].write('iter {}: valid total loss={:0.4f}, valid classifier loss={:0.4f}\n'.format(i, \
+                total_loss.data.cpu(), classifier_loss.data.cpu().float().item(),))
             config['out_file'].flush()
             writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i)
             writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i)
-            writer.add_scalar("validation entropy minimization loss", em_loss.data.cpu().float().item(), i)
+            #writer.add_scalar("training entropy minimization loss", em_loss.data.cpu().float().item(), i)
             
     return best_acc
 
@@ -285,8 +283,7 @@ if __name__ == "__main__":
 
     # set loss
 
-    config["loss"] = {"name": loss_dict[args.loss_type], 
-                      "ly_type": args.ly_type, 
+    config["loss"] = { "ly_type": args.ly_type, 
                       "update_iter":500, 
                       "em_loss_coef": args.em_loss_coef, }
     
