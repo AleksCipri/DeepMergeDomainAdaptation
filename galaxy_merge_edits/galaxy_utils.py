@@ -71,7 +71,7 @@ def distance_to_centroids(x, centroids):
     return torch.norm(dist, dim=-1)
 
 
-def distance_classification_test(loader, model, centroids, gpu=True):
+def distance_classification_test(loader, dictionary_val, model, centroids, gpu=True):
     start_test = True
     with torch.no_grad():
         # if test_10crop:
@@ -99,8 +99,8 @@ def distance_classification_test(loader, model, centroids, gpu=True):
         #             all_output = torch.cat((all_output, outputs.data.float()), 0)
         #             all_label = torch.cat((all_label, labels.data.float()), 0)
         # else:
-        iter_test = iter(loader["source_test"])
-        for i in range(len(loader['source_test'])):
+        iter_test = iter(loader[str(dictionary_val)])
+        for i in range(len(loader[str(dictionary_val)])):
             data = iter_test.next()
             inputs = data[0]
             labels = data[1]
