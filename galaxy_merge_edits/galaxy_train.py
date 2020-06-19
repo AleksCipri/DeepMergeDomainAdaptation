@@ -244,11 +244,7 @@ def train(config):
              + loss_params["em_loss_coef"] * em_loss \
              + classifier_loss
         
-        # final loss
-        if config["domain_adapt"] == 'False':
-            classifier_loss.backward() #we need to fix this
-        else:
-            total_loss.backward()
+        total_loss.backward()
 
         if center_grad is not None:
             # clear mmc_loss
