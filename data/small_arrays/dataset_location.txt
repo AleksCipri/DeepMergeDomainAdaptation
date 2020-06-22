@@ -1,3 +1,7 @@
 For a small dataset of 1500 images + labels go to this link to download:
 
 https://drive.google.com/drive/folders/1QSmmeaHx8zkseDS0nHb1l7MzHZ1m20WE?usp=sharing
+
+In case you would like to use full dataset of around 15000 images you can find it here:
+
+https://drive.google.com/drive/folders/1p01Q3uDseGVsoiOzvhbJqynWLCP28D8X?usp=sharing
