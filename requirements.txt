@@ -1,1 +1,10 @@
-
+pytorch
+torchvision
+numpy
+matplotlib
+mlxtend
+tensorboard
+tensorboardX
+notebook
+ipython
+scikit-learn
