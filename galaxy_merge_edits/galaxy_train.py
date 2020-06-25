@@ -1,5 +1,5 @@
 '''
-script to launch training: 
+script to launch training:
 nohup python2 train_pada.py --gpu_id 1 --net ResNet50 --dset office --s_dset_path ../data/office/webcam_31_list.txt --t_dset_path ../data/office/amazon_10_list.txt --test_interval 500 --snapshot_interval 10000 --output_dir san/w2a
 '''
 
@@ -32,15 +32,16 @@ def train(config):
 
     # set up early stop
     early_stop_engine = EarlyStopping(config["early_stop_patience"])
-             
+
     ## set loss
     class_num = config["network"]["params"]["class_num"]
 
     class_criterion = nn.CrossEntropyLoss()
 
     transfer_criterion = config["loss"]["name"]
-    center_criterion = config["loss"]["discriminant_loss"](num_classes=class_num, 
-                                       feat_dim=config["network"]["params"]["bottleneck_dim"])
+    center_criterion = config["loss"]["discriminant_loss"](
+        num_classes=class_num,
+        feat_dim=config["network"]["params"]["bottleneck_dim"])
     loss_params = config["loss"]
 
     ## prepare data
@@ -126,7 +127,7 @@ def train(config):
     if use_gpu:
         class_weight = class_weight.cuda()
     parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
- 
+
     ## set optimizer
     optimizer_config = config["optimizer"]
     optimizer = optim_dict[optimizer_config["type"]](parameter_list, \
@@ -138,7 +139,7 @@ def train(config):
     lr_scheduler = lr_schedule.schedule_dict[optimizer_config["lr_type"]]
 
 
-    ## train   
+    ## train
     len_train_source = len(dset_loaders["source"]) - 1
     len_train_target = len(dset_loaders["target"]) - 1
     len_valid_source = len(dset_loaders["source_valid"]) - 1
@@ -166,9 +167,9 @@ def train(config):
                     gpu=use_gpu)
             else:
                 raise ValueError("no test method for cls loss: {}".format(config['loss']['ly_type']))
-            
-            snapshot_obj = {'step': i, 
-                            "base_network": base_network.state_dict(), 
+
+            snapshot_obj = {'step': i,
+                            "base_network": base_network.state_dict(),
                             'valid accuracy': temp_acc,
                             'train accuracy' : train_acc,
                             }
@@ -176,7 +177,7 @@ def train(config):
             if temp_acc > best_acc:
                 best_acc = temp_acc
                 # save best model
-                torch.save(snapshot_obj, 
+                torch.save(snapshot_obj,
                            osp.join(config["output_path"], "best_model.pth.tar"))
             log_str = "iter: {:05d}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i, config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
             config["out_file"].write(log_str)
@@ -190,9 +191,9 @@ def train(config):
                 break
 
         if (i+1) % config["snapshot_interval"] == 0:
-            torch.save(snapshot_obj, 
+            torch.save(snapshot_obj,
                         osp.join(config["output_path"], "iter_{:05d}_model.pth.tar".format(i)))
-                    
+
 
         ## train one iter
         base_network.train(True)
@@ -217,7 +218,7 @@ def train(config):
         else:
             inputs_source, inputs_target, labels_source = Variable(inputs_source), \
                 Variable(inputs_target), Variable(labels_source)
-           
+
         inputs = torch.cat((inputs_source, inputs_target), dim=0)
         source_batch_size = inputs_source.size(0)
 
@@ -234,7 +235,7 @@ def train(config):
         # source domain classification task loss
         classifier_loss = class_criterion(source_logits, labels_source.long())
         # fisher loss on labeled source domain
-        fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=loss_params["inter_type"], 
+        fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=loss_params["inter_type"],
                                                                                intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
         # entropy minimization loss
         em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
@@ -243,7 +244,7 @@ def train(config):
              + fisher_loss \
              + loss_params["em_loss_coef"] * em_loss \
              + classifier_loss
-        
+
         total_loss.backward()
 
         if center_grad is not None:
@@ -258,8 +259,8 @@ def train(config):
             config['out_file'].write('iter {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
                 'train entropy min loss={:0.4f}, '
                 'train fisher loss={:0.4f}, train intra-group fisher loss={:0.4f}, train inter-group fisher loss={:0.4f}\n'.format(
-                i, total_loss.data.cpu(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
-                em_loss.data.cpu().float().item(), 
+                i, total_loss.data.cpu(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
+                em_loss.data.cpu().float().item(),
                 fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
                 ))
             config['out_file'].flush()
@@ -294,7 +295,7 @@ def train(config):
             else:
                 inputs_source, inputs_target, labels_source = Variable(inputs_source), \
                     Variable(inputs_target), Variable(labels_source)
-               
+
             inputs = torch.cat((inputs_source, inputs_target), dim=0)
             source_batch_size = inputs_source.size(0)
 
@@ -311,11 +312,11 @@ def train(config):
             # source domain classification task loss
             classifier_loss = class_criterion(source_logits, labels_source.long())
             # fisher loss on labeled source domain
-            fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=loss_params["inter_type"], 
+            fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=loss_params["inter_type"],
                                                                                    intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
             # entropy minimization loss
             em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
-            
+
             # final loss
             total_loss = loss_params["trade_off"] * transfer_loss \
                          + fisher_loss \
@@ -327,8 +328,8 @@ def train(config):
             config['out_file'].write('iter {} valid transfer loss={:0.4f}, valid classifier loss={:0.4f}, '
                 'valid entropy min loss={:0.4f}, '
                 'valid fisher loss={:0.4f}, valid intra-group fisher loss={:0.4f}, valid inter-group fisher loss={:0.4f}\n'.format(
-                i, transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
-                em_loss.data.cpu().float().item(), 
+                i, transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
+                em_loss.data.cpu().float().item(),
                 fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
                 ))
             config['out_file'].flush()
@@ -339,7 +340,7 @@ def train(config):
             writer.add_scalar("validation total fisher loss", fisher_loss.data.cpu().float().item(), i)
             writer.add_scalar("validation intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i)
             writer.add_scalar("validation inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i)
-            
+
     return best_acc
 
 
@@ -353,15 +354,23 @@ if __name__ == "__main__":
     parser.add_argument('--intra_loss_coef', type=float, default=0.0, help="coef of intra_loss.")
     parser.add_argument('--inter_loss_coef', type=float, default=0.0, help="coef of inter_loss.")
     parser.add_argument('--em_loss_coef', type=float, default=0.0, help="coef of entropy minimization loss.")
-    parser.add_argument('--fisher_loss_type', type=str, default="tr", 
-                        choices=["tr", "td"], 
+    parser.add_argument('--fisher_loss_type', type=str, default="tr",
+                        choices=["tr", "td"],
                         help="type of Fisher loss.")
     parser.add_argument('--inter_type', type=str, default="global", choices=["sample", "global"], help="type of inter_class loss.")
     parser.add_argument('--source_size', type=float, default=1.0, help="source domain sampling size")
     parser.add_argument('--target_size', type=float, default=1.0, help="target domain sampling size")
     parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
-    parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
+    parser.add_argument('--dset_path', type=str, default=None, help="The source dataset FULL directory path")
+    parser.add_argument('--pristine_xfile', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy',
+                        help="The pristine X-vals file name")
+    parser.add_argument('--pristine_yfile', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy',
+                        help="The pristine y-vals (labels) file name")
+    parser.add_argument('--noisy_xfile', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_3FILT.npy',
+                        help="The noisy X-vals file name")
+    parser.add_argument('--noisy_yfile', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy',
+                        help="The noisy y-vals (labels) file name")
     parser.add_argument('--test_interval', type=int, default=500, help="interval of two continuous test phase")
     parser.add_argument('--snapshot_interval', type=int, default=5000, help="interval of two continuous output model")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
@@ -390,24 +399,24 @@ if __name__ == "__main__":
 
     # set loss
     loss_dict = {"coral":loss.CORAL, "mmd":loss.mmd_distance}
-    fisher_loss_dict = {"tr": loss.FisherTR, 
-                         "td": loss.FisherTD, 
+    fisher_loss_dict = {"tr": loss.FisherTR,
+                         "td": loss.FisherTD,
                          }
-    config["loss"] = {"name": loss_dict[args.loss_type], 
-                      "ly_type": args.ly_type, 
+    config["loss"] = {"name": loss_dict[args.loss_type],
+                      "ly_type": args.ly_type,
                       "fisher_loss_type": args.fisher_loss_type,
                       "discriminant_loss": fisher_loss_dict[args.fisher_loss_type],
-                      "trade_off":args.trade_off, "update_iter":500, 
-                      "intra_loss_coef": args.intra_loss_coef, "inter_loss_coef": args.inter_loss_coef, "inter_type": args.inter_type, 
+                      "trade_off":args.trade_off, "update_iter":500,
+                      "intra_loss_coef": args.intra_loss_coef, "inter_loss_coef": args.inter_loss_coef, "inter_type": args.inter_type,
                       "em_loss_coef": args.em_loss_coef, }
-    
+
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
     elif "ResNet" in args.net:
         config["network"] = {"name":network.ResNetFc, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
-    
+
 
     if config["optim_choice"] == 'Adam':
         config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.0005, "amsgrad":False, "eps":1e-8}, \
@@ -420,28 +429,32 @@ if __name__ == "__main__":
     if args.lr is not None:
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
 
-        
+
     config["dataset"] = args.dset
     config["path"] = args.dset_path
 
-    if config["dataset"] == 'galaxy': 
-        pristine_x = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy'))
-        pristine_y = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy'))
+    if config["dataset"] == 'galaxy':
+        print('setting up data')
+        pristine_x = array_to_tensor(
+            osp.join(config['path'], args.pristine_xfile))
+        pristine_y = array_to_tensor(
+            osp.join(config['path'], args.pristine_yfile))
 
-        noisy_x = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_noisy_SB25_augmented_3FILT.npy'))
-        noisy_y = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy'))
+        noisy_x = array_to_tensor(
+            osp.join(config['path'], args.noisy_xfile))
+        noisy_y = array_to_tensor(
+            osp.join(config['path'], args.noisy_xfile))
 
         update(pristine_x, noisy_x)
 
         config["network"]["params"]["class_num"] = 2
 
-    
     if args.lr is None: #i deleted a tab here
         config["optimizer"]["lr_param"]["init_lr"] = 0.0003
-            
+
     else:
          raise ValueError('{} cannot be found. ')
-    
+
     config["out_file"].write("config: {}\n".format(config))
     config["out_file"].flush()
 
