@@ -391,6 +391,8 @@ if __name__ == "__main__":
     config["high"] = 1.0 #should this maybe be .5? the other data ranged from .25 to .5
     config["output_for_test"] = True
     config["output_path"] = args.output_dir
+    config["log_iter"] = 25
+    config["early_stop_patience"] = 100
     config["optim_choice"] = args.optim_choice
 
 
@@ -424,18 +426,30 @@ if __name__ == "__main__":
     if config["optim_choice"] == 'Adam':
         config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.9,0.999), "weight_decay":0.01, \
                                 "amsgrad":False, "eps":1e-8}, \
-                        "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
-                     
+                        "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }               
     else:
         config["optimizer"] = {"type":"SGD", "optim_params":{"lr":0.001, "momentum":0.9, \
                                "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
                                "lr_param":{"init_lr":0.005, "gamma":0.001, "power":0.75} }
-
     if args.lr is not None:
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
 
     #load dataset  
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.0001, "amsgrad":True, "eps":1e-8}, \
+                        "lr_type":"inv", "lr_param":{"init_lr":0.0001, "gamma":0.001, "power":0.75} }
+    else:
+        config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
+                               "weight_decay":0.0001, "nesterov":True}, "lr_type":"inv", \
+                               "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
+
+    if args.lr is not None:
+        config["optimizer"]["optim_params"]["lr"] = args.lr
+    if args.lr is None:
+        config["optimizer"]["optim_params"]["lr"] = 0.0001
+    else:
+         raise ValueError('{} cannot be found. ')
+        
     config["dataset"] = args.dset
     config["path"] = args.dset_path
 
@@ -450,12 +464,8 @@ if __name__ == "__main__":
 
         config["network"]["params"]["class_num"] = 2
 
-    
-    # if args.lr is None: #i deleted a tab here
-    #     config["optimizer"]["lr_param"]["init_lr"] = 0.001
-            
-    # else:
-    #      raise ValueError('{} cannot be found. ')
+    config["out_file"].write("config: {}\n".format(config))
+    config["out_file"].flush()
 
     train(config) #make sure you insert the dataloaders
 
