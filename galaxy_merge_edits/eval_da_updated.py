@@ -168,9 +168,10 @@ if __name__ == "__main__":
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
-    config["out_file"] = open(osp.join(config["output_path"], "test_log.txt"), "w")
-    if not osp.exists(config["output_path"]):
-        os.makedirs(config["output_path"])
+        config["out_file"] = open(osp.join(config["output_path"], "test_log.txt"), "w")
+    if osp.exists(config["output_path"]):
+        config["out_file"] = open(osp.join(config["output_path"], "test_log.txt"), "w")
+
 
     config["loss"] = {"trade_off":1.0, "update_iter":500}
 
