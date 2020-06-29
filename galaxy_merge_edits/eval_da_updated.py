@@ -86,8 +86,8 @@ def test(config):
     print('load model from {}'.format(config['ckpt_path']))
 
     ckpt = torch.load(config['ckpt_path'])
-    print('recorded best training accuracy: {:0.4f} at step {}'.format(ckpt["train accuracy"], ckpt["epoch"]))
-    print('recorded best validation accuracy: {:04f} at step {}'.format(ckpt["valid accuracy"], ckpt["epoch"]))
+    print('recorded best training accuracy: {:0.4f} at epoch {}'.format(ckpt["train accuracy"], ckpt["epoch"]))
+    print('recorded best validation accuracy: {:04f} at epoch {}'.format(ckpt["valid accuracy"], ckpt["epoch"]))
 
     train_accuracy = ckpt["train accuracy"]
     valid_accuracy = ckpt["valid accuracy"]
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     if osp.exists(config["output_path"]):
         config["out_file"] = open(osp.join(config["output_path"], "test_log.txt"), "w") 
 
-    config["loss"] = {"trade_off":1.0, "update_iter":100}
+    config["loss"] = {"trade_off":1.0, "update_iter":200}
 
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \
