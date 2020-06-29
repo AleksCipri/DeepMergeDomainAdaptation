@@ -69,15 +69,15 @@ def test(config):
 
     #put your dataloaders here
     #i stole batch size numbers from below
-    dset_loaders["source"] = DataLoader(dsets["source"], batch_size = 36, shuffle = True, num_workers = 1)
-    dset_loaders["target"] = DataLoader(dsets["target"], batch_size = 36, shuffle = True, num_workers = 1)
+    dset_loaders["source"] = DataLoader(dsets["source"], batch_size =128, shuffle = True, num_workers = 1)
+    dset_loaders["target"] = DataLoader(dsets["target"], batch_size = 128, shuffle = True, num_workers = 1)
 
     #guessing batch size based on what was done for testing in the original file
-    dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 4, shuffle = True, num_workers = 1)
-    dset_loaders["target_valid"] = DataLoader(dsets["target_valid"], batch_size = 4, shuffle = True, num_workers = 1)
+    dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 64, shuffle = True, num_workers = 1)
+    dset_loaders["target_valid"] = DataLoader(dsets["target_valid"], batch_size = 64, shuffle = True, num_workers = 1)
 
-    dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 4, shuffle = True, num_workers = 1)
-    dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 4, shuffle = True, num_workers = 1)
+    dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 64, shuffle = True, num_workers = 1)
+    dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 64, shuffle = True, num_workers = 1)
 
 
     class_num = config["network"]["params"]["class_num"]
@@ -86,8 +86,8 @@ def test(config):
     print('load model from {}'.format(config['ckpt_path']))
 
     ckpt = torch.load(config['ckpt_path'])
-    print('recorded best training accuracy: {:0.4f} at step {}'.format(ckpt["train accuracy"], ckpt["step"]))
-    print('recorded best validation accuracy: {:04f} at step {}'.format(ckpt["valid accuracy"], ckpt["step"]))
+    print('recorded best training accuracy: {:0.4f} at epoch {}'.format(ckpt["train accuracy"], ckpt["epoch"]))
+    print('recorded best validation accuracy: {:04f} at epoch {}'.format(ckpt["valid accuracy"], ckpt["epoch"]))
 
     train_accuracy = ckpt["train accuracy"]
     valid_accuracy = ckpt["valid accuracy"]
@@ -166,14 +166,19 @@ if __name__ == "__main__":
     config["output_path"] = os.path.split(args.ckpt_path)[0]
     config['ly_type'] = args.ly_type
 
+    # if not osp.exists(config["output_path"]):
+    #     os.makedirs(config["output_path"])
+    # config["out_file"] = open(osp.join(config["output_path"], "test_log.txt"), "w")
+    # if not osp.exists(config["output_path"]):
+    #     os.makedirs(config["output_path"])
+
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
         config["out_file"] = open(osp.join(config["output_path"], "test_log.txt"), "w")
     if osp.exists(config["output_path"]):
-        config["out_file"] = open(osp.join(config["output_path"], "test_log.txt"), "w")
+        config["out_file"] = open(osp.join(config["output_path"], "test_log.txt"), "w") 
 
-
-    config["loss"] = {"trade_off":1.0, "update_iter":500}
+    config["loss"] = {"trade_off":1.0, "update_iter":200}
 
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \

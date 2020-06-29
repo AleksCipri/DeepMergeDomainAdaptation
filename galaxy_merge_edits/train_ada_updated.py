@@ -27,11 +27,6 @@ optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 def train(config):
     ## set up summary writer
     writer = SummaryWriter(config['output_path'])
-
-    # set up early stop
-    early_stop_engine = EarlyStopping(config["early_stop_patience"])
-               
-    ## set loss
     class_num = config["network"]["params"]["class_num"]
     loss_params = config["loss"]
 
@@ -79,18 +74,31 @@ def train(config):
 
     #put your dataloaders here
     #i stole batch size numbers from below
-    dset_loaders["source"] = DataLoader(dsets["source"], batch_size = 36, shuffle = True, num_workers = 1)
-    dset_loaders["target"] = DataLoader(dsets["target"], batch_size = 36, shuffle = True, num_workers = 1)
+    dset_loaders["source"] = DataLoader(dsets["source"], batch_size =128, shuffle = True, num_workers = 1)
+    dset_loaders["target"] = DataLoader(dsets["target"], batch_size = 128, shuffle = True, num_workers = 1)
 
     #guessing batch size based on what was done for testing in the original file
-    dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 4, shuffle = True, num_workers = 1)
-    dset_loaders["target_valid"] = DataLoader(dsets["target_valid"], batch_size = 4, shuffle = True, num_workers = 1)
+    dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 64, shuffle = True, num_workers = 1)
+    dset_loaders["target_valid"] = DataLoader(dsets["target_valid"], batch_size = 64, shuffle = True, num_workers = 1)
 
-    dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 4, shuffle = True, num_workers = 1)
-    dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 4, shuffle = True, num_workers = 1)
+    dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 64, shuffle = True, num_workers = 1)
+    dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 64, shuffle = True, num_workers = 1)
 
     config['out_file'].write("dataset sizes: source={}, target={}\n".format(
         len(dsets["source"]), len(dsets["target"])))
+
+    config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]
+    config["early_stop_patience"] = len(dset_loaders["source"])*20
+    config["test_interval"] = len(dset_loaders["source"])
+    config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
+    config["log_iter"] = len(dset_loaders["source"])
+
+    #print the configuration you are using
+    config["out_file"].write("config: {}\n".format(config))
+    config["out_file"].flush()
+
+    # set up early stop
+    early_stop_engine = EarlyStopping(config["early_stop_patience"])
 
     ## set base network
     net_config = config["network"]
@@ -122,6 +130,7 @@ def train(config):
         ad_net = ad_net.cuda()
     parameter_list.append({"params":ad_net.parameters(), "lr_mult":10, 'decay_mult':2})
     parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
+    #Should I put lr_mult here as 1 for DeepMerge too? Probably!
  
     ## set optimizer
     optimizer_config = config["optimizer"]
@@ -142,6 +151,7 @@ def train(config):
 
     transfer_loss_value = classifier_loss_value = total_loss_value = 0.0
     best_acc = 0.0
+
     for i in range(config["num_iterations"]):
         if i % config["test_interval"] == 0:
             base_network.train(False)
@@ -162,7 +172,7 @@ def train(config):
             else:
                 raise ValueError("no test method for cls loss: {}".format(config['loss']['ly_type']))
             
-            snapshot_obj = {'step': i, 
+            snapshot_obj = {'epoch': i/len(dset_loaders["source"]), 
                             "base_network": base_network.state_dict(), 
                             'valid accuracy': temp_acc,
                             'train accuracy' : train_acc,                            
@@ -174,20 +184,20 @@ def train(config):
                 # save best model
                 torch.save(snapshot_obj, 
                            osp.join(config["output_path"], "best_model.pth.tar"))
-            log_str = "iter: {:05d}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i, config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
+            log_str = "epoch: {}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i/len(dset_loaders["source"]), config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
             config["out_file"].write(log_str)
             config["out_file"].flush()
-            writer.add_scalar("validation accuracy", temp_acc, i)
-            writer.add_scalar("training accuracy", train_acc, i)
+            writer.add_scalar("validation accuracy", temp_acc, i/len(dset_loaders["source"]))
+            writer.add_scalar("training accuracy", train_acc, i/len(dset_loaders["source"]))
 
             if early_stop_engine.is_stop_training(temp_acc):
                 config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
-                    config["early_stop_patience"], i))
+                    config["early_stop_patience"], i/len(dset_loaders["source"])))
                 break
 
         if (i+1) % config["snapshot_interval"] == 0:
             torch.save(snapshot_obj, 
-                       osp.join(config["output_path"], "iter_{:05d}_model.pth.tar".format(i)))
+                       osp.join(config["output_path"], "epoch_{:05d}_model.pth.tar".format(i/len(dset_loaders["source"]))))
         
 
         ## train one iter
@@ -227,8 +237,8 @@ def train(config):
 
         ad_net.train(True)
         weight_ad = torch.ones(inputs.size(0))
-        # transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
-        #                                    weight_ad, use_gpu)
+        transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
+                                            weight_ad, use_gpu)
         ad_out, _ = ad_net(features.detach())
         ad_acc, source_acc_ad, target_acc_ad = domain_cls_accuracy(ad_out)
 
@@ -237,20 +247,21 @@ def train(config):
         # fisher loss on labeled source domain
 
         if config["fisher_or_no"] == 'no':
-            total_loss = classifier_loss
+            total_loss = loss_params["trade_off"] * transfer_loss \
+            + classifier_loss
 
             if i % config["log_iter"] == 0:
-                config['out_file'].write('iter {}: train total loss={:0.4f}, train classifier loss={:0.4f},'
+                config['out_file'].write('epoch {}: train total loss={:0.4f}, train classifier loss={:0.4f},'
                     'train source+target domain accuracy={:0.4f}, train source domain accuracy={:0.4f}, train target domain accuracy={:0.4f}\n'.format(
-                    i, total_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
+                    i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
                     ad_acc, source_acc_ad, target_acc_ad,
                     ))
                 config['out_file'].flush()
-                writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i)
-                writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i)
-                writer.add_scalar("training source+target domain accuracy", ad_acc, i)
-                writer.add_scalar("training source domain accuracy", source_acc_ad, i)
-                writer.add_scalar("training target domain accuracy", target_acc_ad, i)
+                writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                writer.add_scalar("training source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
+                writer.add_scalar("training source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
+                writer.add_scalar("training target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
         else:  
             transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
@@ -273,26 +284,26 @@ def train(config):
                 center_criterion.centers.backward(center_grad)
 
             if i % config["log_iter"] == 0:
-                config['out_file'].write('iter {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
+                config['out_file'].write('epoch {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
                     'train entropy min loss={:0.4f}, '
                     'train fisher loss={:0.4f}, train intra-group fisher loss={:0.4f}, train inter-group fisher loss={:0.4f}, '
                     'train source+target domain accuracy={:0.4f}, train source domain accuracy={:0.4f}, train target domain accuracy={:0.4f}\n'.format(
-                    i, total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
+                    i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
                     em_loss.data.cpu().float().item(), 
                     fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
                     ad_acc, source_acc_ad, target_acc_ad, 
                     ))
 
                 config['out_file'].flush()
-                writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i)
-                writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i)
-                writer.add_scalar("training transfer_loss", transfer_loss.data.cpu().float().item(), i)
-                writer.add_scalar("training total fisher loss", fisher_loss.data.cpu().float().item(), i)
-                writer.add_scalar("training intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i)
-                writer.add_scalar("training inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i)
-                writer.add_scalar("training source+target domain accuracy", ad_acc, i)
-                writer.add_scalar("training source domain accuracy", source_acc_ad, i)
-                writer.add_scalar("training target domain accuracy", target_acc_ad, i)
+                writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                writer.add_scalar("training transfer_loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                writer.add_scalar("training total fisher loss", fisher_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                writer.add_scalar("training intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                writer.add_scalar("training inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                writer.add_scalar("training source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
+                writer.add_scalar("training source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
+                writer.add_scalar("training target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
         total_loss.backward()
 
@@ -345,20 +356,21 @@ def train(config):
 
 
             if config["fisher_or_no"] == 'no':
-                total_loss = classifier_loss
+                total_loss = loss_params["trade_off"] * transfer_loss \
+                            + classifier_loss
 
                 if i % config["log_iter"] == 0:
-                    config['out_file'].write('iter {}: valid total loss={:0.4f}, valid classifier loss={:0.4f},'
+                    config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid classifier loss={:0.4f},'
                         'valid source+target domain accuracy={:0.4f}, valid source domain accuracy={:0.4f}, valid target domain accuracy={:0.4f}\n'.format(
-                        i, total_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
+                        i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
                         ad_acc, source_acc_ad, target_acc_ad,
                         ))
                     config['out_file'].flush()
-                    writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i)
-                    writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i)
-                    writer.add_scalar("validation source+target domain accuracy", ad_acc, i)
-                    writer.add_scalar("validation source domain accuracy", source_acc_ad, i)
-                    writer.add_scalar("validation target domain accuracy", target_acc_ad, i)
+                    writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
             else:
                 transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
                                                    weight_ad, use_gpu)
@@ -376,26 +388,26 @@ def train(config):
             #total_loss.backward() no backprop on the eval mode
 
                 if i % config["log_iter"] == 0:
-                    config['out_file'].write('iter {}: valid total loss={:0.4f}, valid transfer loss={:0.4f}, valid classifier loss={:0.4f}, '
+                    config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid transfer loss={:0.4f}, valid classifier loss={:0.4f}, '
                         'valid entropy min loss={:0.4f}, '
                         'valid fisher loss={:0.4f}, valid intra-group fisher loss={:0.4f}, valid inter-group fisher loss={:0.4f}, '
                         'valid source+target domain accuracy={:0.4f}, valid source domain accuracy={:0.4f}, valid target domain accuracy={:0.4f}\n'.format(
-                        i, total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
+                        i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
                         em_loss.data.cpu().float().item(), 
                         fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
                         ad_acc, source_acc_ad, target_acc_ad, 
                         ))
 
                     config['out_file'].flush()
-                    writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i)
-                    writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i)
-                    writer.add_scalar("validation transfer_loss", transfer_loss.data.cpu().float().item(), i)
-                    writer.add_scalar("validation total fisher loss", fisher_loss.data.cpu().float().item(), i)
-                    writer.add_scalar("validation intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i)
-                    writer.add_scalar("validation inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i)
-                    writer.add_scalar("validation source+target domain accuracy", ad_acc, i)
-                    writer.add_scalar("validation source domain accuracy", source_acc_ad, i)
-                    writer.add_scalar("validation target domain accuracy", target_acc_ad, i)
+                    writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation transfer_loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation total fisher loss", fisher_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
     return best_acc
 
@@ -412,26 +424,20 @@ if __name__ == "__main__":
                         choices=["tr", "td"], 
                         help="type of Fisher loss.")
     parser.add_argument('--inter_type', type=str, default="global", choices=["none", "sample", "global"], help="type of inter_class loss.")
-    parser.add_argument('--source_size', type=float, default=1.0, help="source domain sampling size")
-    parser.add_argument('--target_size', type=float, default=1.0, help="target domain sampling size")
     parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='office', help="The dataset or source dataset used")
     parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
-    parser.add_argument('--test_interval', type=int, default=500, help="interval of two continuous test phase")
-    parser.add_argument('--snapshot_interval', type=int, default=5000, help="interval of two continuous output model")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
     parser.add_argument('--optim_choice', type=str, default='SGD', help='Adam or SGD')
     parser.add_argument('--fisher_or_no', type=str, default='Fisher', help='run the code without fisher loss')
+    parser.add_argument('--epochs', type=int, default=200, help='How many epochs do you want to train?')
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
     # train config
     config = {}
     config["high"] = 1.0
-    config["num_iterations"] = 12004
-    # config["num_iterations"] = 1 # debug
-    config["test_interval"] = args.test_interval
-    config["snapshot_interval"] = args.snapshot_interval
+    config["epochs"] = args.epochs
     config["output_for_test"] = True
     config["output_path"] = args.output_dir
     config["log_iter"] = 100
@@ -440,19 +446,18 @@ if __name__ == "__main__":
     config["fisher_or_no"] = args.fisher_or_no
 
     if not osp.exists(config["output_path"]):
-        # os.makedirs(config["output_path"])
-        os.makedirs(osp.join(config["output_path"]))
+        os.makedirs(config["output_path"])
         config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
-    else:
-        config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
+    if osp.exists(config["output_path"]):
+        config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w") 
 
     loss_dict = {"tr": loss.FisherTR, 
-                 "td": loss.FisherTD, 
+                 "td ": loss.FisherTD, 
                  }
     config["loss"] = {"loss_name": args.fisher_loss_type,
                       "loss_type": loss_dict[args.fisher_loss_type],
                       "ly_type": args.ly_type, 
-                      "trade_off":args.trade_off, 
+                      "trade_off":args.trade_off, "update_iter":200,
                       "intra_loss_coef": args.intra_loss_coef, "inter_loss_coef": args.inter_loss_coef, "inter_type": args.inter_type, 
                       "em_loss_coef": args.em_loss_coef}
     
@@ -465,17 +470,19 @@ if __name__ == "__main__":
     
 
     if config["optim_choice"] == 'Adam':
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.0001, "amsgrad":True, "eps":1e-8}, \
-                        "lr_type":"inv", "lr_param":{"init_lr":0.0001, "gamma":0.001, "power":0.75} }
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.9,0.999), "weight_decay":0.01, \
+                                "amsgrad":False, "eps":1e-8}, \
+                        "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
     else:
-        config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
+        config["optimizer"] = {"type":"SGD", "optim_params":{"lr":0.001, "momentum":0.9, \
                                "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
-                               "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
+                               "lr_param":{"init_lr":0.005, "gamma":0.001, "power":0.75} }
 
     if args.lr is not None:
         config["optimizer"]["optim_params"]["lr"] = args.lr
+        config["optimizer"]["lr_param"]["init_lr"] = args.lr
     if args.lr is None:
-        config["optimizer"]["optim_params"]["lr"] = 0.0001
+        config["optimizer"]["optim_params"]["lr"] = 0.003
     else:
          raise ValueError('{} cannot be found. ')
 
@@ -492,7 +499,6 @@ if __name__ == "__main__":
         update(pristine_x, noisy_x)
 
         config["network"]["params"]["class_num"] = 2
-
     else:
         raise ValueError("invalid argument {} for dataset".format(config["dataset"]))
     

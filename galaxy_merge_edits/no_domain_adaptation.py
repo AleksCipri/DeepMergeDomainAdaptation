@@ -27,11 +27,8 @@ optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 def train(config):
     ## set up summary writer
     writer = SummaryWriter(config['output_path'])
-
     class_num = config["network"]["params"]["class_num"]
-
     class_criterion = nn.CrossEntropyLoss()
-
     loss_params = config["loss"]
 
     ## prepare data
@@ -208,7 +205,6 @@ def train(config):
             #attempted validation step
             for j in range(0, len(dset_loaders["source_valid"])):
                 base_network.train(False)
-                #base_network.eval()
                 with torch.no_grad():
                     if i % len_valid_source == 0:
                         iter_valid = iter(dset_loaders["source_valid"])
@@ -249,7 +245,7 @@ def train(config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Feature-based Transfer Learning')
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
-    parser.add_argument('--lr', type=float, default=0.0, help="learning rate")
+    parser.add_argument('--lr', type=float, default=0.001, help="learning rate")
     parser.add_argument('--ly_type', type=str, default="cosine", choices=["cosine", "euclidean"], help="type of classification loss.")
     parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
@@ -288,9 +284,9 @@ if __name__ == "__main__":
     
     #set optimizer
     if config["optim_choice"] == 'Adam':
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.005, \
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.9,0.999), "weight_decay":0.01, \
                                  "amsgrad":False, "eps":1e-8} , \
-                        "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.0005, "power":0.75}}
+                        "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75}}
     else:
         config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
                                "weight_decay":0.005, "nesterov":True}, "lr_type":"inv" , \
@@ -298,7 +294,6 @@ if __name__ == "__main__":
 
     #override default if it is specified
     if args.lr is not None:
-        config["optimizer"]["lr_param"]["init_lr"] = args.lr
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
     
@@ -333,4 +328,3 @@ if __name__ == "__main__":
 
     config["out_file"].write("finish training! \n")
     config["out_file"].close()
-
