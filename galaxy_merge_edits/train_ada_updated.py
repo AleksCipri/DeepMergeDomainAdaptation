@@ -197,7 +197,7 @@ def train(config):
 
         if (i+1) % config["snapshot_interval"] == 0:
             torch.save(snapshot_obj, 
-                       osp.join(config["output_path"], "epoch_{:05d}_model.pth.tar".format(i/len(dset_loaders["source"]))))
+                       osp.join(config["output_path"], "epoch_{}_model.pth.tar".format(i/len(dset_loaders["source"]))))
         
 
         ## train one iter
