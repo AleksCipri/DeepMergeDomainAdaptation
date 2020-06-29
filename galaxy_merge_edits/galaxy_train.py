@@ -377,8 +377,8 @@ if __name__ == "__main__":
     config["snapshot_interval"] = args.snapshot_interval
     config["output_for_test"] = True
     config["output_path"] = args.output_dir
-    config["log_iter"] = 100
-    config["early_stop_patience"] = 10
+    config["log_iter"] = 25
+    config["early_stop_patience"] = 100
     config["optim_choice"] = args.optim_choice
 
     if not osp.exists(config["output_path"]):
@@ -410,16 +410,19 @@ if __name__ == "__main__":
     
 
     if config["optim_choice"] == 'Adam':
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.0005, "amsgrad":False, "eps":1e-8}, \
-                        "lr_type":"inv", "lr_param":{"init_lr":0.000025, "gamma":0.001, "power":0.75} }
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.0001, "amsgrad":True, "eps":1e-8}, \
+                        "lr_type":"inv", "lr_param":{"init_lr":0.0001, "gamma":0.001, "power":0.75} }
     else:
         config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
-                               "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
+                               "weight_decay":0.0001, "nesterov":True}, "lr_type":"inv", \
                                "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
 
     if args.lr is not None:
-        config["optimizer"]["lr_param"]["init_lr"] = args.lr
-
+        config["optimizer"]["optim_params"]["lr"] = args.lr
+    if args.lr is None:
+        config["optimizer"]["optim_params"]["lr"] = 0.0001
+    else:
+         raise ValueError('{} cannot be found. ')
         
     config["dataset"] = args.dset
     config["path"] = args.dset_path
@@ -434,13 +437,6 @@ if __name__ == "__main__":
         update(pristine_x, noisy_x)
 
         config["network"]["params"]["class_num"] = 2
-
-    
-    if args.lr is None: #i deleted a tab here
-        config["optimizer"]["lr_param"]["init_lr"] = 0.0003
-            
-    else:
-         raise ValueError('{} cannot be found. ')
     
     config["out_file"].write("config: {}\n".format(config))
     config["out_file"].flush()

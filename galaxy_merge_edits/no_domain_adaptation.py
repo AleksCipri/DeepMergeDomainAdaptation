@@ -24,14 +24,9 @@ from import_and_normalize import array_to_tensor
 
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
-#import the preprocessed tensors
-
 def train(config):
     ## set up summary writer
     writer = SummaryWriter(config['output_path'])
-
-    # set up early stop
-    early_stop_engine = EarlyStopping(config["early_stop_patience"])
 
     class_num = config["network"]["params"]["class_num"]
 
@@ -61,12 +56,25 @@ def train(config):
 
     #put your dataloaders here
     #i stole batch size numbers from below
-    dset_loaders["source"] = DataLoader(dsets["source"], batch_size = 36, shuffle = True, num_workers = 1)
-    dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 4, shuffle = True, num_workers = 1)
-    dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 4, shuffle = True, num_workers = 1)
+    dset_loaders["source"] = DataLoader(dsets["source"], batch_size = 128, shuffle = True, num_workers = 1)
+    dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 64, shuffle = True, num_workers = 1)
+    dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 64, shuffle = True, num_workers = 1)
 
     config['out_file'].write("dataset sizes: source={}\n".format(
         len(dsets["source"])))
+
+    config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]
+    config["early_stop_patience"] = len(dset_loaders["source"])*20
+    config["test_interval"] = len(dset_loaders["source"])
+    config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
+    config["log_iter"] = len(dset_loaders["source"])
+
+    #print the configuration you are using
+    config["out_file"].write("config: {}\n".format(config))
+    config["out_file"].flush()
+
+    # set up early stop
+    early_stop_engine = EarlyStopping(config["early_stop_patience"])
 
     ## set base network
     net_config = config["network"]
@@ -78,7 +86,7 @@ def train(config):
 
     ## collect parameters
     if "DeepMerge" in args.net:
-            parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
+            parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
     elif net_config["params"]["new_cls"]:
         if net_config["params"]["use_bottleneck"]:
             parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
@@ -103,7 +111,7 @@ def train(config):
     for param_group in optimizer.param_groups:
         param_lr.append(param_group["lr"])
     schedule_param = optimizer_config["lr_param"]
-    lr_scheduler = lr_schedule.schedule_dict[optimizer_config["lr_type"]]
+    lr_scheduler = lr_schedule.schedule_dict[optimizer_config["lr_type"]] #just make this Adam
 
     ## train   
     len_train_source = len(dset_loaders["source"]) - 1
@@ -127,7 +135,7 @@ def train(config):
             else:
                 raise ValueError("no test method for cls loss: {}".format(config['loss']['ly_type']))
             
-            snapshot_obj = {'step': i, 
+            snapshot_obj = {'epoch': i/len(dset_loaders["source"]), 
                             "base_network": base_network.state_dict(), 
                             'valid accuracy': temp_acc,
                             'train accuracy' : train_acc,
@@ -137,27 +145,31 @@ def train(config):
                 # save best model
                 torch.save(snapshot_obj, 
                            osp.join(config["output_path"], "best_model.pth.tar"))
-            log_str = "iter: {:05d}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i, config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
+            log_str = "epoch: {}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i/len(dset_loaders["source"]), config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
             config["out_file"].write(log_str)
             config["out_file"].flush()
-            writer.add_scalar("validation accuracy", temp_acc, i)
-            writer.add_scalar("training accuracy", train_acc, i)
+            writer.add_scalar("validation accuracy", temp_acc, i/len(dset_loaders["source"]))
+            writer.add_scalar("training accuracy", train_acc, i/len(dset_loaders["source"]))
 
             if early_stop_engine.is_stop_training(temp_acc):
-                config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
-                    config["early_stop_patience"], i))
+                config["out_file"].write("no improvement after {}, stop training at epoch {}\n".format(
+                    config["early_stop_patience"], i/len(dset_loaders["source"])))
                 # config["out_file"].write("finish training! \n")
                 break
 
         if (i+1) % config["snapshot_interval"] == 0:
             torch.save(snapshot_obj, 
-                        osp.join(config["output_path"], "iter_{:05d}_model.pth.tar".format(i)))
+                        osp.join(config["output_path"], "epoch_{}_model.pth.tar".format(i/len(dset_loaders["source"]))))
                     
 
         ## train one iter
         base_network.train(True)
-        optimizer = lr_scheduler(param_lr, optimizer, i, **schedule_param)
+
+        if i % config["log_iter"] == 0:
+            optimizer = lr_scheduler(param_lr, optimizer, i, **schedule_param)
+
         optimizer.zero_grad()
+
         if i % len_train_source == 0:
             iter_source = iter(dset_loaders["source"])
 
@@ -179,10 +191,6 @@ def train(config):
 
         # source domain classification task loss
         classifier_loss = class_criterion(source_logits, labels_source.long())
-        
-        # entropy minimization loss
-        #em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
-        #total_loss = loss_params["em_loss_coef"] * em_loss + classifier_loss
 
         total_loss = classifier_loss
    
@@ -191,56 +199,49 @@ def train(config):
         optimizer.step()
 
         if i % config["log_iter"] == 0:
-            config['out_file'].write('iter {}: train total loss={:0.4f}, train classifier loss={:0.4f}\n'.format(i, \
+            config['out_file'].write('epoch {}: train total loss={:0.4f}, train classifier loss={:0.4f}\n'.format(i/len(dset_loaders["source"]), \
                 total_loss.data.cpu(), classifier_loss.data.cpu().float().item(),))
             config['out_file'].flush()
-            writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i)
-            writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i)
-            #writer.add_scalar("training entropy minimization loss", em_loss.data.cpu().float().item(), i)
-        
+            writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+            writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
 
-        #attempted validation step
-        base_network.eval()
-        with torch.no_grad():
-            if i % len_valid_source == 0:
-                iter_source = iter(dset_loaders["source_valid"])
+            #attempted validation step
+            for j in range(0, len(dset_loaders["source_valid"])):
+                base_network.train(False)
+                #base_network.eval()
+                with torch.no_grad():
+                    if i % len_valid_source == 0:
+                        iter_valid = iter(dset_loaders["source_valid"])
 
-            try:
-                inputs_source, labels_source = iter_source.next()
+                    try:
+                        inputs_source, labels_source = iter_valid.next() #is this why it's overfitting
+                    except StopIteration:
+                        iter_valid = iter(dset_loaders["source_valid"])
 
-            except StopIteration:
-                iter_source = iter(dset_loaders["source_valid"])
+                    if use_gpu:
+                        inputs_source, labels_source = Variable(inputs_source).cuda(), Variable(labels_source).cuda()
+                    else:
+                        inputs_source,labels_source = Variable(inputs_source), Variable(labels_source)
+                       
+                    inputs = inputs_source
+                    source_batch_size = inputs_source.size(0)
 
-            if use_gpu:
-                inputs_source, labels_source = Variable(inputs_source).cuda(), Variable(labels_source).cuda()
-            else:
-                inputs_source,labels_source = Variable(inputs_source), Variable(labels_source)
-               
-            inputs = inputs_source
-            source_batch_size = inputs_source.size(0)
+                    features, logits = base_network(inputs)
+                    source_logits = logits.narrow(0, 0, source_batch_size)
+                
+                    # source domain classification task loss
+                    classifier_loss = class_criterion(source_logits, labels_source.long())
+                    
+                    # final loss
+                    total_loss = classifier_loss
+                    #total_loss.backward() no backprop on the eval mode
 
-            features, logits = base_network(inputs)
-            source_logits = logits.narrow(0, 0, source_batch_size)
-        
-
-            # source domain classification task loss
-            classifier_loss = class_criterion(source_logits, labels_source.long())
-           
-            # entropy minimization loss
-            #em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
-            
-            # final loss
-            #total_loss = loss_params["em_loss_coef"] * em_loss + classifier_loss
-            total_loss = classifier_loss
-            #total_loss.backward() no backprop on the eval mode
-
-        if i % config["log_iter"] == 0:
-            config['out_file'].write('iter {}: valid total loss={:0.4f}, valid classifier loss={:0.4f}\n'.format(i, \
-                total_loss.data.cpu(), classifier_loss.data.cpu().float().item(),))
-            config['out_file'].flush()
-            writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i)
-            writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i)
-            #writer.add_scalar("training entropy minimization loss", em_loss.data.cpu().float().item(), i)
+                if j % len(dset_loaders["source_valid"]) == 0:
+                    config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid classifier loss={:0.4f}\n'.format(i/len(dset_loaders["source"]), \
+                        total_loss.data.cpu(), classifier_loss.data.cpu().float().item(),))
+                    config['out_file'].flush()
+                    writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                    writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
             
     return best_acc
 
@@ -248,31 +249,23 @@ def train(config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Feature-based Transfer Learning')
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
-    parser.add_argument('--lr', type=float, help="learning rate")
+    parser.add_argument('--lr', type=float, default=0.0, help="learning rate")
     parser.add_argument('--ly_type', type=str, default="cosine", choices=["cosine", "euclidean"], help="type of classification loss.")
-    parser.add_argument('--em_loss_coef', type=float, default=0.0, help="coef of entropy minimization loss.")
     parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
     parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
-    parser.add_argument('--test_interval', type=int, default=500, help="interval of two continuous test phase")
-    parser.add_argument('--snapshot_interval', type=int, default=5000, help="interval of two continuous output model")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
     parser.add_argument('--optim_choice', type=str, default='SGD', help='Adam or SGD')
+    parser.add_argument('--epochs', type=int, default=200, help='How many epochs do you want to train?')
+    
     args = parser.parse_args()
-
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
     # train config
     config = {}
-    config["high"] = 1.0 #should this maybe be .5? the other data ranged from .25 to .5
-    config["num_iterations"] = 12004
-    # config["num_iterations"] = 1 # debug
-    config["test_interval"] = args.test_interval
-    config["snapshot_interval"] = args.snapshot_interval
+    config["epochs"] = args.epochs
     config["output_for_test"] = True
     config["output_path"] = args.output_dir
-    config["log_iter"] = 100
-    config["early_stop_patience"] = 10
     config["optim_choice"] = args.optim_choice
 
     if not osp.exists(config["output_path"]):
@@ -282,12 +275,10 @@ if __name__ == "__main__":
         config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
 
     # set loss
-
     config["loss"] = { "ly_type": args.ly_type, 
-                      "update_iter":500, 
-                      "em_loss_coef": args.em_loss_coef, }
+                      "update_iter":200, }    
     
-    
+    #set network parameters
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
@@ -295,18 +286,23 @@ if __name__ == "__main__":
         config["network"] = {"name":network.ResNetFc, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
     
+    #set optimizer
     if config["optim_choice"] == 'Adam':
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.0005, "amsgrad":False, "eps":1e-8}, \
-                        "lr_type":"inv", "lr_param":{"init_lr":0.000025, "gamma":0.001, "power":0.75} }
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.005, \
+                                 "amsgrad":False, "eps":1e-8} , \
+                        "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.0005, "power":0.75}}
     else:
         config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
-                               "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
-                               "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
+                               "weight_decay":0.005, "nesterov":True}, "lr_type":"inv" , \
+                               "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75}}
 
+    #override default if it is specified
     if args.lr is not None:
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
-
-        
+        config["optimizer"]["optim_params"]["lr"] = args.lr
+        config["optimizer"]["lr_param"]["init_lr"] = args.lr
+    
+    #load dataset    
     config["dataset"] = args.dset
     config["path"] = args.dset_path
 
@@ -333,16 +329,8 @@ if __name__ == "__main__":
 
         config["network"]["params"]["class_num"] = 2
 
-    if args.lr is None:
-        config["optimizer"]["lr_param"]["init_lr"] = 0.0003
-
-    else:
-         raise ValueError('{} cannot be found. ')
-    
-    config["out_file"].write("config: {}\n".format(config))
-    config["out_file"].flush()
-
     train(config)
 
     config["out_file"].write("finish training! \n")
     config["out_file"].close()
+
