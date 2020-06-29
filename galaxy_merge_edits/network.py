@@ -31,8 +31,9 @@ class AdversarialLayer(torch.autograd.Function):
     iter_num, alpha, low, high, max_iter = ctx.intermediate_results
     #self.iter_,num += 1
     # self.coeff = np.float(2.0 * (self.high - self.low) / (1.0 + np.exp(-self.alpha*self.iter_num / self.max_iter)) - (self.high - self.low) + self.low)
-    coeff = np.float(2.0 * (high - low) / (1.0 + np.exp(-alpha*iter_num / max_iter)) - (high - low) + low)
-    return -coeff * gradOutput
+    #coeff = np.float(2.0 * (high - low) / (1.0 + np.exp(-alpha*iter_num / max_iter)) - (high - low) + low)
+    #return -coeff * gradOutput
+    return -1.0 * gradOutput
 
 class SilenceLayer(torch.autograd.Function):
   def __init__(self):

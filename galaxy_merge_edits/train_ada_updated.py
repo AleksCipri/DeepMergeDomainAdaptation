@@ -440,6 +440,8 @@ if __name__ == "__main__":
     config["epochs"] = args.epochs
     config["output_for_test"] = True
     config["output_path"] = args.output_dir
+    config["log_iter"] = 100
+    config["early_stop_patience"] = 100
     config["optim_choice"] = args.optim_choice
     config["fisher_or_no"] = args.fisher_or_no
 
@@ -479,6 +481,10 @@ if __name__ == "__main__":
     if args.lr is not None:
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
+    if args.lr is None:
+        config["optimizer"]["optim_params"]["lr"] = 0.003
+    else:
+         raise ValueError('{} cannot be found. ')
 
     config["dataset"] = args.dset
     config["path"] = args.dset_path
@@ -493,12 +499,8 @@ if __name__ == "__main__":
         update(pristine_x, noisy_x)
 
         config["network"]["params"]["class_num"] = 2
-
-    #if args.lr is None:
-    #    config["optimizer"]["lr_param"]["init_lr"] = .0003
-
-    #else:
-    #    raise ValueError("invalid argument {} for dataset".format(config["dataset"]))
+    else:
+        raise ValueError("invalid argument {} for dataset".format(config["dataset"]))
     
     config["out_file"].write("config: {}\n".format(config))
     config["out_file"].flush()

@@ -83,7 +83,7 @@ def train(config):
 
     ## collect parameters
     if "DeepMerge" in args.net:
-            parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
+            parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
     elif net_config["params"]["new_cls"]:
         if net_config["params"]["use_bottleneck"]:
             parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
@@ -205,7 +205,6 @@ def train(config):
             #attempted validation step
             for j in range(0, len(dset_loaders["source_valid"])):
                 base_network.train(False)
-                #base_network.eval() should be the same
                 with torch.no_grad():
                     if i % len_valid_source == 0:
                         iter_valid = iter(dset_loaders["source_valid"])
@@ -289,7 +288,7 @@ if __name__ == "__main__":
                                  "amsgrad":False, "eps":1e-8} , \
                         "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75}}
     else:
-        config["optimizer"] = {"type":"SGD", "optim_params":{"lr":0.001, "momentum":0.9, \
+        config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
                                "weight_decay":0.005, "nesterov":True}, "lr_type":"inv" , \
                                "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75}}
 
@@ -329,5 +328,3 @@ if __name__ == "__main__":
 
     config["out_file"].write("finish training! \n")
     config["out_file"].close()
-
-
