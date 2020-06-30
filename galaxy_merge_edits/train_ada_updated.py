@@ -260,6 +260,13 @@ def train(config):
             optimizer.step()
 
             if i % config["log_iter"] == 0:
+
+                if config['grad_vis'] != 'no':
+                    if not osp.exists(osp.join(config["output_path"], "gradients")):
+                        os.makedirs(osp.join(config["output_path"], "gradients"))
+
+                    plot_grad_flow(osp.join(config["output_path"], "gradients"), i/len(dset_loaders["source"]), base_network.named_parameters())
+
                 config['out_file'].write('epoch {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f},'
                     'train source+target domain accuracy={:0.4f}, train source domain accuracy={:0.4f}, train target domain accuracy={:0.4f}\n'.format(
                     i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
@@ -364,6 +371,13 @@ def train(config):
 
 
             if i % config["log_iter"] == 0:
+
+                if config['grad_vis'] != 'no':
+                    if not osp.exists(osp.join(config["output_path"], "gradients")):
+                        os.makedirs(osp.join(config["output_path"], "gradients"))
+
+                    plot_grad_flow(osp.join(config["output_path"], "gradients"), i/len(dset_loaders["source"]), base_network.named_parameters())
+
                 config['out_file'].write('epoch {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
                 'train entropy min loss={:0.4f}, '
                 'train fisher loss={:0.4f}, train intra-group fisher loss={:0.4f}, train inter-group fisher loss={:0.4f}, '
@@ -384,7 +398,6 @@ def train(config):
                 writer.add_scalar("training source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
                 writer.add_scalar("training source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                 writer.add_scalar("training target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
-
 
                 #attempted validation step
                 #if i < len_valid_source:
@@ -431,8 +444,6 @@ def train(config):
 
                         # source domain classification task loss
                         classifier_loss = class_criterion(source_logits, labels_source.long())
-
-
 
                         # fisher loss on labeled source domain
                         fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=loss_params["inter_type"], 
@@ -485,11 +496,22 @@ if __name__ == "__main__":
     parser.add_argument('--inter_type', type=str, default="global", choices=["none", "sample", "global"], help="type of inter_class loss.")
     parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='office', help="The dataset or source dataset used")
-    parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
+    # parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
     parser.add_argument('--optim_choice', type=str, default='SGD', help='Adam or SGD')
     parser.add_argument('--fisher_or_no', type=str, default='Fisher', help='run the code without fisher loss')
     parser.add_argument('--epochs', type=int, default=200, help='How many epochs do you want to train?')
+    parser.add_argument('--grad_vis', type=str, default='no', help='Do you want to visualize your gradients?')
+    parser.add_argument('--dset_path', type=str, default=None, help="The dataset directory path")
+    parser.add_argument('--source_x_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy',
+                         help="Source domain x-values filename")
+    parser.add_argument('--source_y_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy',
+                         help="Source domain y-values filename")
+    parser.add_argument('--target_x_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_3FILT.npy',
+                         help="Target domain x-values filename")
+    parser.add_argument('--target_y_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy',
+                         help="Target domain y-values filename")
+
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
@@ -501,6 +523,7 @@ if __name__ == "__main__":
     config["output_path"] = args.output_dir
     config["optim_choice"] = args.optim_choice
     config["fisher_or_no"] = args.fisher_or_no
+    config["grad_vis"] = args.grad_vis
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
@@ -525,7 +548,7 @@ if __name__ == "__main__":
         config["network"] = {"name":network.ResNetFc, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
     
-
+    #set optimizer
     if config["optim_choice"] == 'Adam':
         config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.9,0.999), "weight_decay":0.01, \
                                 "amsgrad":False, "eps":1e-8}, \
@@ -542,12 +565,12 @@ if __name__ == "__main__":
     config["dataset"] = args.dset
     config["path"] = args.dset_path
 
-    if config["dataset"] == 'galaxy': 
-        pristine_x = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy'))
-        pristine_y = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy'))
+    if config["dataset"] == 'galaxy':
+        pristine_x = array_to_tensor(osp.join(config['path'], args.source_x_file))
+        pristine_y = array_to_tensor(osp.join(config['path'], args.source_y_file))
 
-        noisy_x = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_noisy_SB25_augmented_3FILT.npy'))
-        noisy_y = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy'))
+        noisy_x = array_to_tensor(osp.join(config['path'], args.target_x_file))
+        noisy_y = array_to_tensor(osp.join(config['path'], args.target_y_file))
 
         update(pristine_x, noisy_x)
 
