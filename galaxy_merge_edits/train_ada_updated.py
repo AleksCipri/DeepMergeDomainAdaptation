@@ -177,8 +177,10 @@ def train(config):
                             'valid accuracy': temp_acc,
                             'train accuracy' : train_acc,                            
                             }
+
             if config["loss"]["loss_name"] != "laplacian" and config["loss"]["ly_type"] == "euclidean":
                 snapshot_obj['center_criterion'] = center_criterion.state_dict()
+
             if temp_acc > best_acc:
                 best_acc = temp_acc
                 # save best model
@@ -202,8 +204,12 @@ def train(config):
 
         ## train one iter
         base_network.train(True)
-        optimizer = lr_scheduler(param_lr, optimizer, i, **schedule_param)
+
+        if i % config["log_iter"] == 0:
+            optimizer = lr_scheduler(param_lr, optimizer, i, **schedule_param)
+
         optimizer.zero_grad()
+
         if i % len_train_source == 0:
             iter_source = iter(dset_loaders["source"])
         if i % len_train_target == 0:
@@ -250,22 +256,91 @@ def train(config):
             total_loss = loss_params["trade_off"] * transfer_loss \
             + classifier_loss
 
+            total_loss.backward()
+            optimizer.step()
+
             if i % config["log_iter"] == 0:
-                config['out_file'].write('epoch {}: train total loss={:0.4f}, train classifier loss={:0.4f},'
+                config['out_file'].write('epoch {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f},'
                     'train source+target domain accuracy={:0.4f}, train source domain accuracy={:0.4f}, train target domain accuracy={:0.4f}\n'.format(
-                    i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
+                    i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
                     ad_acc, source_acc_ad, target_acc_ad,
                     ))
                 config['out_file'].flush()
                 writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                 writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                writer.add_scalar("training transfer loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                 writer.add_scalar("training source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
                 writer.add_scalar("training source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                 writer.add_scalar("training target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
-        else:  
-            transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
-                                           weight_ad, use_gpu)      
+                #attempted validation step
+                #if i < len_valid_source:
+                for j in range(0, len(dset_loaders["source_valid"])):
+                    base_network.train(False)
+                    with torch.no_grad():
+                        if i % len_valid_source == 0:
+                            iter_source = iter(dset_loaders["source_valid"])
+                        if i % len_valid_target == 0:
+                            iter_target = iter(dset_loaders["target_valid"])
+
+                        try:
+                            inputs_source, labels_source = iter_source.next()
+                            inputs_target, labels_target = iter_target.next()
+                        except StopIteration:
+                            iter_source = iter(dset_loaders["source_valid"])
+                            iter_target = iter(dset_loaders["target_valid"])
+
+                        if use_gpu:
+                            inputs_source, inputs_target, labels_source = \
+                                Variable(inputs_source).cuda(), Variable(inputs_target).cuda(), \
+                                Variable(labels_source).cuda()
+                        else:
+                            inputs_source, inputs_target, labels_source = Variable(inputs_source), \
+                                Variable(inputs_target), Variable(labels_source)
+                           
+                        inputs = torch.cat((inputs_source, inputs_target), dim=0)
+                        source_batch_size = inputs_source.size(0)
+
+                        if config['loss']['ly_type'] == 'cosine':
+                            features, logits = base_network(inputs)
+                            source_logits = logits.narrow(0, 0, source_batch_size)
+                        elif config['loss']['ly_type'] == 'euclidean':
+                            features, _ = base_network(inputs)
+                            logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
+                            source_logits = logits.narrow(0, 0, source_batch_size)
+
+                        ad_net.train(False)
+                        weight_ad = torch.ones(inputs.size(0))
+                        transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
+                                                           weight_ad, use_gpu)
+                        ad_out, _ = ad_net(features.detach())
+                        ad_acc, source_acc_ad, target_acc_ad = domain_cls_accuracy(ad_out)
+
+                        
+                        # source domain classification task loss
+                        classifier_loss = class_criterion(source_logits, labels_source.long())
+
+
+                        #if config["fisher_or_no"] == 'no':
+                        total_loss = loss_params["trade_off"] * transfer_loss \
+                                    + classifier_loss
+
+                    if j % len(dset_loaders["source_valid"]) == 0:
+                        config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid transfer loss={:0.4f}, valid classifier loss={:0.4f},'
+                            'valid source+target domain accuracy={:0.4f}, valid source domain accuracy={:0.4f}, valid target domain accuracy={:0.4f}\n'.format(
+                            i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
+                            ad_acc, source_acc_ad, target_acc_ad,
+                            ))
+                        config['out_file'].flush()
+                        writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation transfer loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
+                    
+
+        else:       
             fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=config["loss"]["inter_type"], 
                                                                                    intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
             # entropy minimization loss
@@ -277,27 +352,32 @@ def train(config):
                          + loss_params["em_loss_coef"] * em_loss \
                          + classifier_loss
 
+            total_loss.backward()
+
             if center_grad is not None:
                 # clear mmc_loss
                 center_criterion.centers.grad.zero_()
                 # Manually assign centers gradients other than using autograd
                 center_criterion.centers.backward(center_grad)
 
+            optimizer.step()
+
+
             if i % config["log_iter"] == 0:
                 config['out_file'].write('epoch {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
-                    'train entropy min loss={:0.4f}, '
-                    'train fisher loss={:0.4f}, train intra-group fisher loss={:0.4f}, train inter-group fisher loss={:0.4f}, '
-                    'train source+target domain accuracy={:0.4f}, train source domain accuracy={:0.4f}, train target domain accuracy={:0.4f}\n'.format(
-                    i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
-                    em_loss.data.cpu().float().item(), 
-                    fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
-                    ad_acc, source_acc_ad, target_acc_ad, 
-                    ))
+                'train entropy min loss={:0.4f}, '
+                'train fisher loss={:0.4f}, train intra-group fisher loss={:0.4f}, train inter-group fisher loss={:0.4f}, '
+                'train source+target domain accuracy={:0.4f}, train source domain accuracy={:0.4f}, train target domain accuracy={:0.4f}\n'.format(
+                i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
+                em_loss.data.cpu().float().item(), 
+                fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
+                ad_acc, source_acc_ad, target_acc_ad, 
+                ))
 
                 config['out_file'].flush()
                 writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                 writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-                writer.add_scalar("training transfer_loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                writer.add_scalar("training transfer loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                 writer.add_scalar("training total fisher loss", fisher_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                 writer.add_scalar("training intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                 writer.add_scalar("training inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
@@ -305,109 +385,88 @@ def train(config):
                 writer.add_scalar("training source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                 writer.add_scalar("training target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
-        total_loss.backward()
 
-        optimizer.step()
+                #attempted validation step
+                #if i < len_valid_source:
+                for j in range(0, len(dset_loaders["source_valid"])):
+                    base_network.train(False)
+                    with torch.no_grad():
+                        if i % len_valid_source == 0:
+                            iter_source = iter(dset_loaders["source_valid"])
+                        if i % len_valid_target == 0:
+                            iter_target = iter(dset_loaders["target_valid"])
 
-        #attempted validation step
-        #if i < len_valid_source:
-        base_network.eval()
-        with torch.no_grad():
-            if i % len_valid_source == 0:
-                iter_source = iter(dset_loaders["source_valid"])
-            if i % len_valid_target == 0:
-                iter_target = iter(dset_loaders["target_valid"])
+                        try:
+                            inputs_source, labels_source = iter_source.next()
+                            inputs_target, labels_target = iter_target.next()
+                        except StopIteration:
+                            iter_source = iter(dset_loaders["source_valid"])
+                            iter_target = iter(dset_loaders["target_valid"])
 
-            try:
-                inputs_source, labels_source = iter_source.next()
-                inputs_target, labels_target = iter_target.next()
-            except StopIteration:
-                iter_source = iter(dset_loaders["source_valid"])
-                iter_target = iter(dset_loaders["target_valid"])
+                        if use_gpu:
+                            inputs_source, inputs_target, labels_source = \
+                                Variable(inputs_source).cuda(), Variable(inputs_target).cuda(), \
+                                Variable(labels_source).cuda()
+                        else:
+                            inputs_source, inputs_target, labels_source = Variable(inputs_source), \
+                                Variable(inputs_target), Variable(labels_source)
+                           
+                        inputs = torch.cat((inputs_source, inputs_target), dim=0)
+                        source_batch_size = inputs_source.size(0)
 
-            if use_gpu:
-                inputs_source, inputs_target, labels_source = \
-                    Variable(inputs_source).cuda(), Variable(inputs_target).cuda(), \
-                    Variable(labels_source).cuda()
-            else:
-                inputs_source, inputs_target, labels_source = Variable(inputs_source), \
-                    Variable(inputs_target), Variable(labels_source)
-               
-            inputs = torch.cat((inputs_source, inputs_target), dim=0)
-            source_batch_size = inputs_source.size(0)
+                        if config['loss']['ly_type'] == 'cosine':
+                            features, logits = base_network(inputs)
+                            source_logits = logits.narrow(0, 0, source_batch_size)
+                        elif config['loss']['ly_type'] == 'euclidean':
+                            features, _ = base_network(inputs)
+                            logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
+                            source_logits = logits.narrow(0, 0, source_batch_size)
 
-            if config['loss']['ly_type'] == 'cosine':
-                features, logits = base_network(inputs)
-                source_logits = logits.narrow(0, 0, source_batch_size)
-            elif config['loss']['ly_type'] == 'euclidean':
-                features, _ = base_network(inputs)
-                logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
-                source_logits = logits.narrow(0, 0, source_batch_size)
+                        ad_net.train(False)
+                        weight_ad = torch.ones(inputs.size(0))
+                        transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
+                                   weight_ad, use_gpu)
+                        ad_out, _ = ad_net(features.detach())
+                        ad_acc, source_acc_ad, target_acc_ad = domain_cls_accuracy(ad_out)
 
-            ad_net.train(False)
-            weight_ad = torch.ones(inputs.size(0))
-            # transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
-            #                                    weight_ad, use_gpu)
-            ad_out, _ = ad_net(features.detach())
-            ad_acc, source_acc_ad, target_acc_ad = domain_cls_accuracy(ad_out)
-
-            # source domain classification task loss
-            classifier_loss = class_criterion(source_logits, labels_source.long())
+                        # source domain classification task loss
+                        classifier_loss = class_criterion(source_logits, labels_source.long())
 
 
-            if config["fisher_or_no"] == 'no':
-                total_loss = loss_params["trade_off"] * transfer_loss \
-                            + classifier_loss
 
-                if i % config["log_iter"] == 0:
-                    config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid classifier loss={:0.4f},'
-                        'valid source+target domain accuracy={:0.4f}, valid source domain accuracy={:0.4f}, valid target domain accuracy={:0.4f}\n'.format(
-                        i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
-                        ad_acc, source_acc_ad, target_acc_ad,
-                        ))
-                    config['out_file'].flush()
-                    writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
-            else:
-                transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
-                                                   weight_ad, use_gpu)
-                # fisher loss on labeled source domain
-                fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=loss_params["inter_type"], 
-                                                                                       intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
-                # entropy minimization loss
-                em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
-                
-                # final loss
-                total_loss = loss_params["trade_off"] * transfer_loss \
-                             + fisher_loss \
-                             + loss_params["em_loss_coef"] * em_loss \
-                             + classifier_loss
-            #total_loss.backward() no backprop on the eval mode
+                        # fisher loss on labeled source domain
+                        fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=loss_params["inter_type"], 
+                                                                                               intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
+                        # entropy minimization loss
+                        em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
+                        
+                        # final loss
+                        total_loss = loss_params["trade_off"] * transfer_loss \
+                                     + fisher_loss \
+                                     + loss_params["em_loss_coef"] * em_loss \
+                                     + classifier_loss
 
-                if i % config["log_iter"] == 0:
-                    config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid transfer loss={:0.4f}, valid classifier loss={:0.4f}, '
-                        'valid entropy min loss={:0.4f}, '
-                        'valid fisher loss={:0.4f}, valid intra-group fisher loss={:0.4f}, valid inter-group fisher loss={:0.4f}, '
-                        'valid source+target domain accuracy={:0.4f}, valid source domain accuracy={:0.4f}, valid target domain accuracy={:0.4f}\n'.format(
-                        i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
-                        em_loss.data.cpu().float().item(), 
-                        fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
-                        ad_acc, source_acc_ad, target_acc_ad, 
-                        ))
+                    if j % len(dset_loaders["source_valid"]) == 0:
+                        config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid transfer loss={:0.4f}, valid classifier loss={:0.4f}, '
+                            'valid entropy min loss={:0.4f}, '
+                            'valid fisher loss={:0.4f}, valid intra-group fisher loss={:0.4f}, valid inter-group fisher loss={:0.4f}, '
+                            'valid source+target domain accuracy={:0.4f}, valid source domain accuracy={:0.4f}, valid target domain accuracy={:0.4f}\n'.format(
+                            i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(), 
+                            em_loss.data.cpu().float().item(), 
+                            fisher_loss.cpu().float().item(), fisher_intra_loss.cpu().float().item(), fisher_inter_loss.cpu().float().item(),
+                            ad_acc, source_acc_ad, target_acc_ad, 
+                            ))
 
-                    config['out_file'].flush()
-                    writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation transfer_loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation total fisher loss", fisher_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
-                    writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
+                        config['out_file'].flush()
+                        writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation transfer loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation total fisher loss", fisher_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
     return best_acc
 
