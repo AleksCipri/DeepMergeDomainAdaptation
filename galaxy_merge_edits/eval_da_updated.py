@@ -151,11 +151,20 @@ if __name__ == "__main__":
     parser.add_argument('--ly_type', type=str, default="cosine", choices=["cosine", "euclidean"], help="type of classification loss.")
     parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
-    parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path list")
+    # parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path list")
     #parser.add_argument('--domain', type=str, default='source_test', help="Either source_test or target_test")
     parser.add_argument('--ckpt_path', type=str, required=True, help="path to load ckpt")
-    args = parser.parse_args()
+        parser.add_argument('--dset_path', type=str, default=None, help="The dataset directory path")
+    parser.add_argument('--source_x_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy',
+                         help="Source domain x-values filename")
+    parser.add_argument('--source_y_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy',
+                         help="Source domain y-values filename")
+    parser.add_argument('--target_x_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_3FILT.npy',
+                         help="Target domain x-values filename")
+    parser.add_argument('--target_y_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy',
+                         help="Target domain y-values filename")
 
+    args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
     # train config
@@ -165,12 +174,6 @@ if __name__ == "__main__":
     config["ckpt_path"] = args.ckpt_path
     config["output_path"] = os.path.split(args.ckpt_path)[0]
     config['ly_type'] = args.ly_type
-
-    # if not osp.exists(config["output_path"]):
-    #     os.makedirs(config["output_path"])
-    # config["out_file"] = open(osp.join(config["output_path"], "test_log.txt"), "w")
-    # if not osp.exists(config["output_path"]):
-    #     os.makedirs(config["output_path"])
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
@@ -192,12 +195,12 @@ if __name__ == "__main__":
     config["path"] = args.dset_path
     #config["domain"] = args.domain
 
-    if config["dataset"] == 'galaxy': 
-        pristine_x = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy'))
-        pristine_y = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy'))
+    if config["dataset"] == 'galaxy':
+        pristine_x = array_to_tensor(osp.join(config['path'], args.source_x_file))
+        pristine_y = array_to_tensor(osp.join(config['path'], args.source_y_file))
 
-        noisy_x = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_noisy_SB25_augmented_3FILT.npy'))
-        noisy_y = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy'))
+        noisy_x = array_to_tensor(osp.join(config['path'], args.target_x_file))
+        noisy_y = array_to_tensor(osp.join(config['path'], args.target_y_file))
 
         update(pristine_x, noisy_x)
 
