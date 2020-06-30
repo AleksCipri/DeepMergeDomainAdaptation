@@ -21,6 +21,7 @@ from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy
 from import_and_normalize import array_to_tensor
+from plot_gradients import plot_grad_flow
 
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
@@ -83,17 +84,17 @@ def train(config):
 
     ## collect parameters
     if "DeepMerge" in args.net:
-            parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
+            parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
     elif net_config["params"]["new_cls"]:
         if net_config["params"]["use_bottleneck"]:
             parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
                             {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \
                             {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
         else:
-            parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
+            parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":10, 'decay_mult':2}, \
                             {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
     else:
-        parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
+        parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
 
     ## add additional network for some methods
     class_weight = torch.from_numpy(np.array([1.0] * class_num))
@@ -108,7 +109,7 @@ def train(config):
     for param_group in optimizer.param_groups:
         param_lr.append(param_group["lr"])
     schedule_param = optimizer_config["lr_param"]
-    lr_scheduler = lr_schedule.schedule_dict[optimizer_config["lr_type"]] #just make this Adam
+    lr_scheduler = lr_schedule.schedule_dict[optimizer_config["lr_type"]]
 
     ## train   
     len_train_source = len(dset_loaders["source"]) - 1
@@ -196,6 +197,13 @@ def train(config):
         optimizer.step()
 
         if i % config["log_iter"] == 0:
+
+            if config['grad_vis'] != 'no':
+                if not osp.exists(osp.join(config["output_path"], "gradients")):
+                    os.makedirs(osp.join(config["output_path"], "gradients"))
+
+                plot_grad_flow(osp.join(config["output_path"], "gradients"), i/len(dset_loaders["source"]), base_network.named_parameters())
+
             config['out_file'].write('epoch {}: train total loss={:0.4f}, train classifier loss={:0.4f}\n'.format(i/len(dset_loaders["source"]), \
                 total_loss.data.cpu(), classifier_loss.data.cpu().float().item(),))
             config['out_file'].flush()
@@ -249,10 +257,17 @@ if __name__ == "__main__":
     parser.add_argument('--ly_type', type=str, default="cosine", choices=["cosine", "euclidean"], help="type of classification loss.")
     parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
-    parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
+    # parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
     parser.add_argument('--optim_choice', type=str, default='SGD', help='Adam or SGD')
     parser.add_argument('--epochs', type=int, default=200, help='How many epochs do you want to train?')
+    parser.add_argument('--grad_vis', type=str, default='no', help='Do you want to visualize your gradients?')
+    parser.add_argument('--dset_path', type=str, default=None, help="The dataset directory path")
+    parser.add_argument('--source_x_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy',
+                         help="Source domain x-values filename")
+    parser.add_argument('--source_y_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy',
+                         help="Source domain y-values filename")
+
     
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -263,6 +278,7 @@ if __name__ == "__main__":
     config["output_for_test"] = True
     config["output_path"] = args.output_dir
     config["optim_choice"] = args.optim_choice
+    config["grad_vis"] = args.grad_vis
 
     if not osp.exists(config["output_path"]):
         os.makedirs(osp.join(config["output_path"]))
@@ -284,7 +300,7 @@ if __name__ == "__main__":
     
     #set optimizer
     if config["optim_choice"] == 'Adam':
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.9,0.999), "weight_decay":0.01, \
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.8), "weight_decay":0.01, \
                                  "amsgrad":False, "eps":1e-8} , \
                         "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75}}
     else:
@@ -301,9 +317,20 @@ if __name__ == "__main__":
     config["dataset"] = args.dset
     config["path"] = args.dset_path
 
+    if config["dataset"] == 'galaxy':
+        pristine_x = array_to_tensor(osp.join(config['path'], args.pristine_xfile))
+        pristine_y = array_to_tensor(osp.join(config['path'], args.pristine_yfile))
+
+        noisy_x = array_to_tensor(osp.join(config['path'], args.noisy_xfile))
+        noisy_y = array_to_tensor(osp.join(config['path'], args.noisy_xfile))
+
+        update(pristine_x, noisy_x)
+
+        config["network"]["params"]["class_num"] = 2
+
     if config["dataset"] == 'galaxy': 
-        pristine_x = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy'))
-        pristine_y = array_to_tensor(osp.join(os.getcwd(), config['path'], 'SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy'))
+        pristine_x = array_to_tensor(osp.join(config['path'], args.source_x_file))
+        pristine_y = array_to_tensor(osp.join(config['path'], args.source_y_file))
 
         def normalization(t):
             mean1 = t[:,0].mean().item()
