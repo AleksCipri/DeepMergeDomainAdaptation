@@ -312,16 +312,16 @@ if __name__ == "__main__":
     config["dataset"] = args.dset
     config["path"] = args.dset_path
 
-    if config["dataset"] == 'galaxy':
-        pristine_x = array_to_tensor(osp.join(config['path'], args.pristine_xfile))
-        pristine_y = array_to_tensor(osp.join(config['path'], args.pristine_yfile))
+#     if config["dataset"] == 'galaxy':
+#         pristine_x = array_to_tensor(osp.join(config['path'], args.pristine_xfile))
+#         pristine_y = array_to_tensor(osp.join(config['path'], args.pristine_yfile))
 
-        noisy_x = array_to_tensor(osp.join(config['path'], args.noisy_xfile))
-        noisy_y = array_to_tensor(osp.join(config['path'], args.noisy_xfile))
+#         noisy_x = array_to_tensor(osp.join(config['path'], args.noisy_xfile))
+#         noisy_y = array_to_tensor(osp.join(config['path'], args.noisy_xfile))
 
-        update(pristine_x, noisy_x)
+#         update(pristine_x, noisy_x)
 
-        config["network"]["params"]["class_num"] = 2
+#         config["network"]["params"]["class_num"] = 2
 
     if config["dataset"] == 'galaxy': 
         pristine_x = array_to_tensor(osp.join(config['path'], args.source_x_file))
