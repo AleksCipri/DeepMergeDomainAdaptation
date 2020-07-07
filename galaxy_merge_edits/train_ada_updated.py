@@ -87,7 +87,7 @@ def train(config):
     config['out_file'].write("dataset sizes: source={}, target={}\n".format(
         len(dsets["source"]), len(dsets["target"])))
 
-    config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]
+    config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
     config["early_stop_patience"] = len(dset_loaders["source"])*20
     config["test_interval"] = len(dset_loaders["source"])
     config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
@@ -144,16 +144,16 @@ def train(config):
 
 
     ## train   
-    len_train_source = len(dset_loaders["source"]) - 1
-    len_train_target = len(dset_loaders["target"]) - 1
-    len_valid_source = len(dset_loaders["source_valid"]) - 1
-    len_valid_target = len(dset_loaders["target_valid"]) - 1
+    len_train_source = len(dset_loaders["source"])
+    len_train_target = len(dset_loaders["target"])
+    len_valid_source = len(dset_loaders["source_valid"])
+    len_valid_target = len(dset_loaders["target_valid"])
 
     transfer_loss_value = classifier_loss_value = total_loss_value = 0.0
     best_acc = 0.0
 
     for i in range(config["num_iterations"]):
-        if i % config["test_interval"] == 0:
+        if i % config["test_interval"] == 0 and i != 0:
             base_network.train(False)
             if config['loss']['ly_type'] == "cosine":
                 temp_acc, _ = image_classification_test(dset_loaders, 'source_valid', \
@@ -178,14 +178,20 @@ def train(config):
                             'train accuracy' : train_acc,                            
                             }
 
+            if (i+1) % config["snapshot_interval"] == 0:
+                torch.save(snapshot_obj, 
+                       osp.join(config["output_path"], "epoch_{}_model.pth.tar".format(i/len(dset_loaders["source"]))))
+
             if config["loss"]["loss_name"] != "laplacian" and config["loss"]["ly_type"] == "euclidean":
                 snapshot_obj['center_criterion'] = center_criterion.state_dict()
 
             if temp_acc > best_acc:
                 best_acc = temp_acc
+
                 # save best model
                 torch.save(snapshot_obj, 
                            osp.join(config["output_path"], "best_model.pth.tar"))
+
             log_str = "epoch: {}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i/len(dset_loaders["source"]), config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
             config["out_file"].write(log_str)
             config["out_file"].flush()
@@ -196,12 +202,7 @@ def train(config):
                 config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
                     config["early_stop_patience"], i/len(dset_loaders["source"])))
                 break
-
-        if (i+1) % config["snapshot_interval"] == 0:
-            torch.save(snapshot_obj, 
-                       osp.join(config["output_path"], "epoch_{}_model.pth.tar".format(i/len(dset_loaders["source"]))))
         
-
         ## train one iter
         base_network.train(True)
 
@@ -210,17 +211,12 @@ def train(config):
 
         optimizer.zero_grad()
 
-        if i % len_train_source == 0:
-            iter_source = iter(dset_loaders["source"])
-        if i % len_train_target == 0:
-            iter_target = iter(dset_loaders["target"])
-
         try:
-            inputs_source, labels_source = iter_source.next()
-            inputs_target, labels_target = iter_target.next()
+            inputs_source, labels_source = iter(dset_loaders["source"]).next()
+            inputs_target, labels_target = iter(dset_loaders["target"]).next()
         except StopIteration:
-            iter_source = iter(dset_loaders["source"])
-            iter_target = iter(dset_loaders["target"])
+            iter(dset_loaders["source"])
+            iter(dset_loaders["target"])
 
         if use_gpu:
             inputs_source, inputs_target, labels_source = \
@@ -257,16 +253,22 @@ def train(config):
             + classifier_loss
 
             total_loss.backward()
+
+            if center_grad is not None:
+                # clear mmc_loss
+                center_criterion.centers.grad.zero_()
+                # Manually assign centers gradients other than using autograd
+                center_criterion.centers.backward(center_grad)
+
             optimizer.step()
 
-            if i % config["log_iter"] == 0:
+            if i % config["log_iter"] == 0 and i != 0:
 
                 if config['grad_vis'] != 'no':
                     if not osp.exists(osp.join(config["output_path"], "gradients")):
                         os.makedirs(osp.join(config["output_path"], "gradients"))
 
                     plot_grad_flow(osp.join(config["output_path"], "gradients"), i/len(dset_loaders["source"]), base_network.named_parameters())
-
 
                 config['out_file'].write('epoch {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f},'
                     'train source+target domain accuracy={:0.4f}, train source domain accuracy={:0.4f}, train target domain accuracy={:0.4f}\n'.format(
@@ -282,52 +284,45 @@ def train(config):
                 writer.add_scalar("training target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
                 #attempted validation step
-                #if i < len_valid_source:
                 for j in range(0, len(dset_loaders["source_valid"])):
                     base_network.train(False)
                     with torch.no_grad():
-                        if i % len_valid_source == 0:
-                            iter_source = iter(dset_loaders["source_valid"])
-                        if i % len_valid_target == 0:
-                            iter_target = iter(dset_loaders["target_valid"])
 
                         try:
-                            inputs_source, labels_source = iter_source.next()
-                            inputs_target, labels_target = iter_target.next()
+                            inputs_valid_source, labels_valid_source = iter(dset_loaders["source_valid"]).next()
+                            inputs_valid_target, labels_valid_target = iter(dset_loaders["target_valid"]).next()
                         except StopIteration:
-                            iter_source = iter(dset_loaders["source_valid"])
-                            iter_target = iter(dset_loaders["target_valid"])
+                            iter(dset_loaders["source_valid"])
+                            iter(dset_loaders["target_valid"])
 
                         if use_gpu:
-                            inputs_source, inputs_target, labels_source = \
-                                Variable(inputs_source).cuda(), Variable(inputs_target).cuda(), \
-                                Variable(labels_source).cuda()
+                            inputs_valid_source, inputs_valid_target, labels_valid_source = \
+                                Variable(inputs_valid_source).cuda(), Variable(inputs_valid_target).cuda(), \
+                                Variable(labels_valid_source).cuda()
                         else:
-                            inputs_source, inputs_target, labels_source = Variable(inputs_source), \
-                                Variable(inputs_target), Variable(labels_source)
+                            inputs_valid_source, inputs_valid_target, labels_valid_source = Variable(inputs_valid_source), \
+                                Variable(inputs_valid_target), Variable(labels_valid_source)
                            
-                        inputs = torch.cat((inputs_source, inputs_target), dim=0)
-                        source_batch_size = inputs_source.size(0)
+                        valid_inputs = torch.cat((inputs_valid_source, inputs_valid_target), dim=0)
+                        valid_source_batch_size = inputs_valid_source.size(0)
 
                         if config['loss']['ly_type'] == 'cosine':
-                            features, logits = base_network(inputs)
-                            source_logits = logits.narrow(0, 0, source_batch_size)
+                            features, logits = base_network(valid_inputs)
+                            source_logits = logits.narrow(0, 0, valid_source_batch_size)
                         elif config['loss']['ly_type'] == 'euclidean':
-                            features, _ = base_network(inputs)
+                            features, _ = base_network(valid_inputs)
                             logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
-                            source_logits = logits.narrow(0, 0, source_batch_size)
+                            source_logits = logits.narrow(0, 0, valid_source_batch_size)
 
                         ad_net.train(False)
-                        weight_ad = torch.ones(inputs.size(0))
+                        weight_ad = torch.ones(valid_inputs.size(0))
                         transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
                                                            weight_ad, use_gpu)
                         ad_out, _ = ad_net(features.detach())
                         ad_acc, source_acc_ad, target_acc_ad = domain_cls_accuracy(ad_out)
 
-                        
                         # source domain classification task loss
-                        classifier_loss = class_criterion(source_logits, labels_source.long())
-
+                        classifier_loss = class_criterion(source_logits, labels_valid_source.long())
 
                         #if config["fisher_or_no"] == 'no':
                         total_loss = loss_params["trade_off"] * transfer_loss \
@@ -349,7 +344,7 @@ def train(config):
                     
 
         else:       
-            fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=config["loss"]["inter_type"], 
+            fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(valid_inputs.size(0)/2)), labels_source, inter_class=config["loss"]["inter_type"], 
                                                                                    intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
             # entropy minimization loss
             em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
@@ -370,8 +365,7 @@ def train(config):
 
             optimizer.step()
 
-
-            if i % config["log_iter"] == 0:
+            if i % config["log_iter"] == 0 and i != 0:
 
                 if config['grad_vis'] != 'no':
                     if not osp.exists(osp.join(config["output_path"], "gradients")):
@@ -401,53 +395,48 @@ def train(config):
                 writer.add_scalar("training target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
                 #attempted validation step
-                #if i < len_valid_source:
                 for j in range(0, len(dset_loaders["source_valid"])):
                     base_network.train(False)
                     with torch.no_grad():
-                        if i % len_valid_source == 0:
-                            iter_source = iter(dset_loaders["source_valid"])
-                        if i % len_valid_target == 0:
-                            iter_target = iter(dset_loaders["target_valid"])
 
                         try:
-                            inputs_source, labels_source = iter_source.next()
-                            inputs_target, labels_target = iter_target.next()
+                            inputs_source, labels_source = iter(dset_loaders["source_valid"]).next()
+                            inputs_target, labels_target = iter(dset_loaders["target_valid"]).next()
                         except StopIteration:
-                            iter_source = iter(dset_loaders["source_valid"])
-                            iter_target = iter(dset_loaders["target_valid"])
+                            iter(dset_loaders["source_valid"])
+                            iter(dset_loaders["target_valid"])
 
                         if use_gpu:
-                            inputs_source, inputs_target, labels_source = \
-                                Variable(inputs_source).cuda(), Variable(inputs_target).cuda(), \
-                                Variable(labels_source).cuda()
+                            inputs_valid_source, inputs_valid_target, labels_valid_source = \
+                                Variable(inputs_valid_source).cuda(), Variable(inputs_valid_target).cuda(), \
+                                Variable(labels_valid_source).cuda()
                         else:
-                            inputs_source, inputs_target, labels_source = Variable(inputs_source), \
-                                Variable(inputs_target), Variable(labels_source)
+                            inputs_valid_source, inputs_valid_target, labels_valid_source = Variable(inputs_valid_source), \
+                                Variable(inputs_valid_target), Variable(labels_valid_source)
                            
-                        inputs = torch.cat((inputs_source, inputs_target), dim=0)
-                        source_batch_size = inputs_source.size(0)
+                        valid_inputs = torch.cat((inputs_valid_source, inputs_valid_target), dim=0)
+                        valid_source_batch_size = inputs_valid_source.size(0)
 
                         if config['loss']['ly_type'] == 'cosine':
-                            features, logits = base_network(inputs)
-                            source_logits = logits.narrow(0, 0, source_batch_size)
+                            features, logits = base_network(valid_inputs)
+                            source_logits = logits.narrow(0, 0, valid_source_batch_size)
                         elif config['loss']['ly_type'] == 'euclidean':
-                            features, _ = base_network(inputs)
+                            features, _ = base_network(valid_inputs)
                             logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
-                            source_logits = logits.narrow(0, 0, source_batch_size)
+                            source_logits = logits.narrow(0, 0, valid_source_batch_size)
 
                         ad_net.train(False)
-                        weight_ad = torch.ones(inputs.size(0))
+                        weight_ad = torch.ones(valid_inputs.size(0))
                         transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
                                    weight_ad, use_gpu)
                         ad_out, _ = ad_net(features.detach())
                         ad_acc, source_acc_ad, target_acc_ad = domain_cls_accuracy(ad_out)
 
                         # source domain classification task loss
-                        classifier_loss = class_criterion(source_logits, labels_source.long())
+                        classifier_loss = class_criterion(source_logits, labels_valid_source.long())
 
                         # fisher loss on labeled source domain
-                        fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=loss_params["inter_type"], 
+                        fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(valid_inputs.size(0)/2)), labels_valid_source, inter_class=loss_params["inter_type"], 
                                                                                                intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
                         # entropy minimization loss
                         em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
@@ -577,14 +566,7 @@ if __name__ == "__main__":
 
         config["network"]["params"]["class_num"] = 2
 
-    #if args.lr is None:
-    #    config["optimizer"]["lr_param"]["init_lr"] = .0003
-
-    #else:
-    #    raise ValueError("invalid argument {} for dataset".format(config["dataset"]))
-    
-    config["out_file"].write("config: {}\n".format(config))
-    config["out_file"].flush()
     train(config)
+
     config["out_file"].write("finish training! \n")
     config["out_file"].close()
