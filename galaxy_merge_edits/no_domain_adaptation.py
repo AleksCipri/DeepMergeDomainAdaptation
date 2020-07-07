@@ -61,7 +61,7 @@ def train(config):
     config['out_file'].write("dataset sizes: source={}\n".format(
         len(dsets["source"])))
 
-    config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]
+    config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
     config["early_stop_patience"] = len(dset_loaders["source"])*20
     config["test_interval"] = len(dset_loaders["source"])
     config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
@@ -112,14 +112,14 @@ def train(config):
     lr_scheduler = lr_schedule.schedule_dict[optimizer_config["lr_type"]]
 
     ## train   
-    len_train_source = len(dset_loaders["source"]) - 1
-    len_valid_source = len(dset_loaders["source_valid"]) - 1
+    len_train_source = len(dset_loaders["source"])
+    len_valid_source = len(dset_loaders["source_valid"])
 
     classifier_loss_value = 0.0
     best_acc = 0.0
 
     for i in range(config["num_iterations"]):
-        if i % config["test_interval"] == 0:
+        if i % config["test_interval"] == 0 and i != 0:
             base_network.train(False)
             if config['loss']['ly_type'] == "cosine":
                 temp_acc, _ = image_classification_test(dset_loaders, 'source_valid', \
@@ -138,6 +138,11 @@ def train(config):
                             'valid accuracy': temp_acc,
                             'train accuracy' : train_acc,
                             }
+
+            if (i+1) % config["snapshot_interval"] == 0:
+                torch.save(snapshot_obj, 
+                        osp.join(config["output_path"], "epoch_{}_model.pth.tar".format(i/len(dset_loaders["source"]))))
+                    
             if temp_acc > best_acc:
                 best_acc = temp_acc
                 # save best model
@@ -155,11 +160,6 @@ def train(config):
                 # config["out_file"].write("finish training! \n")
                 break
 
-        if (i+1) % config["snapshot_interval"] == 0:
-            torch.save(snapshot_obj, 
-                        osp.join(config["output_path"], "epoch_{}_model.pth.tar".format(i/len(dset_loaders["source"]))))
-                    
-
         ## train one iter
         base_network.train(True)
 
@@ -168,13 +168,10 @@ def train(config):
 
         optimizer.zero_grad()
 
-        if i % len_train_source == 0:
-            iter_source = iter(dset_loaders["source"])
-
         try:
-            inputs_source, labels_source = iter_source.next()
+            inputs_source, labels_source = iter(dset_loaders["source"]).next()
         except StopIteration:
-            iter_source = iter(dset_loaders["source"])
+            iter(dset_loaders["source"])
 
         if use_gpu:
             inputs_source, labels_source = Variable(inputs_source).cuda(), Variable(labels_source).cuda()
@@ -196,7 +193,7 @@ def train(config):
 
         optimizer.step()
 
-        if i % config["log_iter"] == 0:
+        if i % config["log_iter"] == 0 and i != 0:
 
             if config['grad_vis'] != 'no':
                 if not osp.exists(osp.join(config["output_path"], "gradients")):
@@ -214,13 +211,11 @@ def train(config):
             for j in range(0, len(dset_loaders["source_valid"])):
                 base_network.train(False)
                 with torch.no_grad():
-                    if i % len_valid_source == 0:
-                        iter_valid = iter(dset_loaders["source_valid"])
 
                     try:
-                        inputs_source, labels_source = iter_valid.next() #is this why it's overfitting
+                        inputs_source, labels_source = iter(dset_loaders["source_valid"]).next() #is this why it's overfitting
                     except StopIteration:
-                        iter_valid = iter(dset_loaders["source_valid"])
+                        iter(dset_loaders["source_valid"])
 
                     if use_gpu:
                         inputs_source, labels_source = Variable(inputs_source).cuda(), Variable(labels_source).cuda()
