@@ -84,18 +84,19 @@ def compute_pairwise_distances(x, y):
 
 
 def gaussian_kernel_matrix(x, y, sigmas):
-    beta = 1. / (2. * (torch.unsqueeze(sigmas, 1)))
+    beta = 1. / (2. * (torch.unsqueeze(sigmas, 1))) #what is beta
     dist = compute_pairwise_distances(x, y)
     # print('dist shape={}'.format(dist.size()))
     s = torch.matmul(beta, dist.contiguous().view(1, -1))
     return torch.sum(torch.exp(-s), 0).view(*dist.size())
 
 
+#this is their equivalent to D(X,Y, Fancy F)
 def maximum_mean_discrepancy(x, y, kernel=gaussian_kernel_matrix):
     cost = torch.mean(kernel(x, x))
     cost += torch.mean(kernel(y, y))
     cost -= 2 * torch.mean(kernel(x, y))
-    # We do not allow the loss to become negative.
+    # We do not allow the loss to become negative. #should we absolute value instead?
     cost = torch.clamp(cost, min=0.0)
     return cost
 
