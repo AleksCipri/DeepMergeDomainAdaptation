@@ -344,7 +344,7 @@ def train(config):
                     
 
         else:       
-            fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(valid_inputs.size(0)/2)), labels_source, inter_class=config["loss"]["inter_type"], 
+            fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=config["loss"]["inter_type"], 
                                                                                    intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
             # entropy minimization loss
             em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
@@ -400,8 +400,8 @@ def train(config):
                     with torch.no_grad():
 
                         try:
-                            inputs_source, labels_source = iter(dset_loaders["source_valid"]).next()
-                            inputs_target, labels_target = iter(dset_loaders["target_valid"]).next()
+                            inputs_valid_source, labels_valid_source = iter(dset_loaders["source_valid"]).next()
+                            inputs_valid_target, labels_valid_target = iter(dset_loaders["target_valid"]).next()
                         except StopIteration:
                             iter(dset_loaders["source_valid"])
                             iter(dset_loaders["target_valid"])
