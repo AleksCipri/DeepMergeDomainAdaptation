@@ -86,7 +86,7 @@ def train(config):
 
 
     config['out_file'].write("dataset sizes: source={}, target={}\n".format(
-        len(dsets["source"]), len(dsets["target"]))) #TODO: change this too
+        len(dsets["source"]), len(dsets["target"])))
 
     config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
     config["early_stop_patience"] = len(dset_loaders["source"])*20
@@ -186,6 +186,7 @@ def train(config):
                 # save best model
                 torch.save(snapshot_obj, 
                            osp.join(config["output_path"], "best_model.pth.tar"))
+            
             log_str = "epoch: {}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i/len(dset_loaders["source"]), config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
             config["out_file"].write(log_str)
             config["out_file"].flush()
@@ -285,7 +286,6 @@ def train(config):
             writer.add_scalar("training inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
 
             #attempted validation step
-            #base_network.eval()
             for j in range(0, len(dset_loaders["source_valid"])):
                 base_network.train(False)
                 with torch.no_grad():
@@ -317,8 +317,8 @@ def train(config):
                         logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
                         source_logits = logits.narrow(0, 0, valid_source_batch_size)
 
-                    print("valid source", features[:valid_source_batch_size].size())
-                    print("valid target", features[valid_source_batch_size:].size())
+                    # print("valid source", features[:valid_source_batch_size].size())
+                    # print("valid target", features[valid_source_batch_size:].size())
 
                     transfer_loss = transfer_criterion(features[:valid_source_batch_size], features[valid_source_batch_size:])
 
