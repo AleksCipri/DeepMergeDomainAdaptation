@@ -154,7 +154,7 @@ if __name__ == "__main__":
     # parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path list")
     #parser.add_argument('--domain', type=str, default='source_test', help="Either source_test or target_test")
     parser.add_argument('--ckpt_path', type=str, required=True, help="path to load ckpt")
-        parser.add_argument('--dset_path', type=str, default=None, help="The dataset directory path")
+    parser.add_argument('--dset_path', type=str, default=None, help="The dataset directory path")
     parser.add_argument('--source_x_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy',
                          help="Source domain x-values filename")
     parser.add_argument('--source_y_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy',
