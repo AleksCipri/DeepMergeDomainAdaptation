@@ -164,7 +164,10 @@ def train(config):
         base_network.train(True)
 
         if i % config["log_iter"] == 0:
-            optimizer = lr_scheduler(param_lr, optimizer, i, **schedule_param)
+            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+
+        if config["optimizer"]["lr_type"] == "one-cycle":
+            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
 
         optimizer.zero_grad()
 
@@ -262,7 +265,7 @@ if __name__ == "__main__":
                          help="Source domain x-values filename")
     parser.add_argument('--source_y_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy',
                          help="Source domain y-values filename")
-
+    parser.add_argument('--one_cycle', type=str, default = 'one-cycle', help='Do you want to turn on one-cycle learning rate?')
     
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -307,6 +310,10 @@ if __name__ == "__main__":
     if args.lr is not None:
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
+        config["frozen lr"] = args.lr
+
+    if args.one_cycle is not None:
+        config["optimizer"]["lr_type"] = "one-cycle"
     
     #load dataset    
     config["dataset"] = args.dset
