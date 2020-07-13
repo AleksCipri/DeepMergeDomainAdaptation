@@ -1,4 +1,4 @@
-from onecyclelr import OneCycleLR
+#from onecyclelr import OneCycleLR
 
 def inv_lr_scheduler(param_lr, optimizer, iter_num, epoch_length, lr_extra, gamma, power, init_lr=0.001, weight_decay=5e-4):
 	"""Decay learning rate by a factor of 0.1 every lr_decay_epoch epochs."""
