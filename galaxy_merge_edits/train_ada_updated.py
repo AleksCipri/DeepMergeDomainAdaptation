@@ -461,6 +461,7 @@ def train(config):
                         config['out_file'].flush()
                         writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+                        writer.add_scalar("validation entropy minimization loss", em_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation transfer loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation total fisher loss", fisher_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
