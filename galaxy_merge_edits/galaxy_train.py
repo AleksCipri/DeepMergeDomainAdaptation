@@ -202,7 +202,10 @@ def train(config):
         base_network.train(True)
 
         if i % config["log_iter"] == 0:
-            optimizer = lr_scheduler(param_lr, optimizer, i, **schedule_param)
+            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+
+        if config["optimizer"]["lr_type"] == "one-cycle":
+            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
 
         optimizer.zero_grad()
 
@@ -259,6 +262,10 @@ def train(config):
             # Manually assign centers gradients other than using autograd
             center_criterion.centers.backward(center_grad)
 
+        # if config["optimizer"]["lr_type"] == "one-cycle":
+        #     scheduler.step()
+        #     optimizer.step()
+        # else:
         optimizer.step()
 
         if i % config["log_iter"] == 0 and i != 0:
@@ -387,7 +394,7 @@ if __name__ == "__main__":
                          help="Target domain x-values filename")
     parser.add_argument('--target_y_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy',
                          help="Target domain y-values filename")
-    
+    parser.add_argument('--one_cycle', type=str, default = 'one-cycle', help='Do you want to turn on one-cycle learning rate?')
     
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -430,7 +437,8 @@ if __name__ == "__main__":
     if config["optim_choice"] == 'Adam':
         config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.0005, "betas":(0.7,0.8), "weight_decay":0.01, \
                                 "amsgrad":False, "eps":1e-8}, \
-                        "lr_type":"inv", "lr_param":{"init_lr":0.0005, "gamma":0.001, "power":0.75} }               
+                        "lr_type":"inv", "lr_param":{"init_lr":0.0005, "gamma":0.001, "power":0.75} }   
+
     else:
         config["optimizer"] = {"type":"SGD", "optim_params":{"lr":0.001, "momentum":0.9, \
                                "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
@@ -450,6 +458,10 @@ if __name__ == "__main__":
     if args.lr is not None:
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
+        config["frozen lr"] = args.lr
+
+    if args.one_cycle is not None:
+        config["optimizer"]["lr_type"] = "one-cycle"
         
     config["dataset"] = args.dset
     config["path"] = args.dset_path
@@ -465,10 +477,7 @@ if __name__ == "__main__":
 
         config["network"]["params"]["class_num"] = 2
 
-    # config["out_file"].write("config: {}\n".format(config))
-    # config["out_file"].flush()
-
-    train(config) #make sure you insert the dataloaders
+    train(config)
 
     config["out_file"].write("finish training! \n")
     config["out_file"].close()
