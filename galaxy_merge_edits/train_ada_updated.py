@@ -257,11 +257,11 @@ def train(config):
 
             total_loss.backward()
 
-            if center_grad is not None:
-                # clear mmc_loss
-                center_criterion.centers.grad.zero_()
-                # Manually assign centers gradients other than using autograd
-                center_criterion.centers.backward(center_grad)
+#             if center_grad is not None:
+#                 # clear mmc_loss
+#                 center_criterion.centers.grad.zero_()
+#                 # Manually assign centers gradients other than using autograd
+#                 center_criterion.centers.backward(center_grad)
 
             optimizer.step()
 
