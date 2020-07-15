@@ -38,3 +38,22 @@ def plot_grad_flow(path, epoch, named_parameters):
     plt.savefig('epoch '+str(epoch)+'.png')
     os.chdir(cwd)
     plt.clf()
+
+
+def plot_learning_rate_scan(lr_rates, total_loss, epoch, path):
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import os
+
+    cwd = os.getcwd()
+
+    plt.plot(np.array(lr_rates), np.array(total_loss))
+    plt.semilogx()
+
+    os.chdir(path)
+    plt.savefig('epoch '+str(epoch)+'.png')
+    os.chdir(cwd)
+    plt.clf()
+
+

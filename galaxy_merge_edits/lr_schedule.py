@@ -1,4 +1,5 @@
 from onecyclelr import OneCycleLR
+import numpy as np
 
 def inv_lr_scheduler(param_lr, optimizer, iter_num, epoch_length, lr_extra, gamma, power, init_lr=0.001, weight_decay=5e-4):
 	"""Decay learning rate by a factor of 0.1 every lr_decay_epoch epochs."""
@@ -73,4 +74,23 @@ def cycle1(param_lr, optimizer, iter_num, epoch_length, lr, **kwargs):
 
 	return optimizer
 
-schedule_dict = {"inv":inv_lr_scheduler, "one-cycle": cycle1}
+
+def linear_to_find_baseline(param_lr, optimizer, iter_num, epoch_length, lr, **kwargs):
+
+	# min_lr = lr/1000
+	# max_lr = 1000*lr
+	num_epochs = 5
+	# lr_spectrum = np.arange(min_lr, num_epochs, max_lr)
+	lr_spectrum = np.linspace(1e-6, 1, 85*num_epochs+1)
+	num_steps = epoch_length
+
+	#on_step = iter_num//epoch_length
+
+	lr = lr_spectrum[iter_num]
+
+	for param_group in optimizer.param_groups:
+		param_group['lr'] = lr
+
+	return optimizer
+
+schedule_dict = {"inv":inv_lr_scheduler, "one-cycle": cycle1, "linear": linear_to_find_baseline}
