@@ -21,7 +21,7 @@ from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy
 from import_and_normalize import array_to_tensor
-from plot_gradients import plot_grad_flow
+from visualize import plot_grad_flow, plot_learning_rate_scan
 
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
@@ -62,7 +62,7 @@ def train(config):
         len(dsets["source"])))
 
     config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
-    config["early_stop_patience"] = len(dset_loaders["source"])*20
+    config["early_stop_patience"] = len(dset_loaders["source"])*10
     config["test_interval"] = len(dset_loaders["source"])
     config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
     config["log_iter"] = len(dset_loaders["source"])
@@ -101,6 +101,8 @@ def train(config):
     if use_gpu:
         class_weight = class_weight.cuda()
  
+    parameter_list.append({"params":class_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
+
     ## set optimizer
     optimizer_config = config["optimizer"]
     optimizer = optim_dict[optimizer_config["type"]](parameter_list, \
@@ -110,6 +112,9 @@ def train(config):
         param_lr.append(param_group["lr"])
     schedule_param = optimizer_config["lr_param"]
     lr_scheduler = lr_schedule.schedule_dict[optimizer_config["lr_type"]]
+
+    scan_lr = []
+    scan_loss = []
 
     ## train   
     len_train_source = len(dset_loaders["source"])
@@ -128,8 +133,8 @@ def train(config):
                 train_acc, _ = image_classification_test(dset_loaders, 'source', \
                     base_network, \
                     gpu=use_gpu)
-            # you can't use the euclidean distance_loss because it involves the target domain
-
+            elif config['loss']['ly_type'] == 'euclidean':
+                print('You cannot use the euclidean distance loss because it involves the target domain')
             else:
                 raise ValueError("no test method for cls loss: {}".format(config['loss']['ly_type']))
             
@@ -138,6 +143,8 @@ def train(config):
                             'valid accuracy': temp_acc,
                             'train accuracy' : train_acc,
                             }
+
+            snapshot_obj['class_criterion'] = class_criterion.state_dict()
 
             if (i+1) % config["snapshot_interval"] == 0:
                 torch.save(snapshot_obj, 
@@ -154,11 +161,11 @@ def train(config):
             writer.add_scalar("validation accuracy", temp_acc, i/len(dset_loaders["source"]))
             writer.add_scalar("training accuracy", train_acc, i/len(dset_loaders["source"]))
 
-            if early_stop_engine.is_stop_training(temp_acc):
-                config["out_file"].write("no improvement after {}, stop training at epoch {}\n".format(
-                    config["early_stop_patience"], i/len(dset_loaders["source"])))
-                # config["out_file"].write("finish training! \n")
-                break
+            # if early_stop_engine.is_stop_training(temp_acc):
+            #     config["out_file"].write("no improvement after {}, stop training at epoch {}\n".format(
+            #         config["early_stop_patience"], i/len(dset_loaders["source"])))
+            #     # config["out_file"].write("finish training! \n")
+            #     break
 
         ## train one iter
         base_network.train(True)
@@ -168,6 +175,12 @@ def train(config):
 
         if config["optimizer"]["lr_type"] == "one-cycle":
             optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+
+        if config["optimizer"]["lr_type"] == "linear":
+            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+
+        optim = optimizer.state_dict()
+        scan_lr.append(optim['param_groups'][0]['lr'])
 
         optimizer.zero_grad()
 
@@ -191,12 +204,21 @@ def train(config):
         classifier_loss = class_criterion(source_logits, labels_source.long())
 
         total_loss = classifier_loss
-   
+
+        scan_loss.append(total_loss.cpu().float().item())
+           
         total_loss.backward()
 
         optimizer.step()
 
         if i % config["log_iter"] == 0 and i != 0:
+
+            if config['lr_scan'] != 'no':
+                if not osp.exists(osp.join(config["output_path"], "learning_rate_scan")):
+                    os.makedirs(osp.join(config["output_path"], "learning_rate_scan"))
+
+                plot_learning_rate_scan(scan_lr, scan_loss, i/len(dset_loaders["source"]), osp.join(config["output_path"], "learning_rate_scan"))
+
 
             if config['grad_vis'] != 'no':
                 if not osp.exists(osp.join(config["output_path"], "gradients")):
@@ -245,6 +267,12 @@ def train(config):
                     writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                     writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
             
+            if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
+                config["out_file"].write("overfitting after {}, stop training at epoch {}\n".format(
+                    config["early_stop_patience"], i/len(dset_loaders["source"])))
+                # config["out_file"].write("finish training! \n")
+                break
+
     return best_acc
 
 
@@ -266,7 +294,8 @@ if __name__ == "__main__":
     parser.add_argument('--source_y_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy',
                          help="Source domain y-values filename")
     parser.add_argument('--one_cycle', type=str, default = 'one-cycle', help='Do you want to turn on one-cycle learning rate?')
-    
+    parser.add_argument('--lr_scan', type=str, default = 'no', help='Set to yes for learning rate scan')
+
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
@@ -277,6 +306,7 @@ if __name__ == "__main__":
     config["output_path"] = args.output_dir
     config["optim_choice"] = args.optim_choice
     config["grad_vis"] = args.grad_vis
+    config['lr_scan'] = args.lr_scan
 
     if not osp.exists(config["output_path"]):
         os.makedirs(osp.join(config["output_path"]))
@@ -314,21 +344,17 @@ if __name__ == "__main__":
 
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
+
+    if args.lr_scan is not None:
+        config["optimizer"]["lr_type"] = "linear"
+        config["optimizer"]["optim_params"]["lr"] = 1e-6
+        config["optimizer"]["lr_param"]["init_lr"] = 1e-6
+        config["frozen lr"] = 1e-6
+        config["epochs"] = 5
     
     #load dataset    
     config["dataset"] = args.dset
     config["path"] = args.dset_path
-
-#     if config["dataset"] == 'galaxy':
-#         pristine_x = array_to_tensor(osp.join(config['path'], args.pristine_xfile))
-#         pristine_y = array_to_tensor(osp.join(config['path'], args.pristine_yfile))
-
-#         noisy_x = array_to_tensor(osp.join(config['path'], args.noisy_xfile))
-#         noisy_y = array_to_tensor(osp.join(config['path'], args.noisy_xfile))
-
-#         update(pristine_x, noisy_x)
-
-#         config["network"]["params"]["class_num"] = 2
 
     if config["dataset"] == 'galaxy': 
         pristine_x = array_to_tensor(osp.join(config['path'], args.source_x_file))
