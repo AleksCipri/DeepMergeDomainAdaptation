@@ -21,7 +21,7 @@ from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy
 from import_and_normalize import array_to_tensor, update
-from plot_gradients import plot_grad_flow
+from visualize import plot_grad_flow, plot_learning_rate_scan
 
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
@@ -30,7 +30,6 @@ def train(config):
     writer = SummaryWriter(config['output_path'])
     class_num = config["network"]["params"]["class_num"]
     class_criterion = nn.CrossEntropyLoss()
-
     transfer_criterion = config["loss"]["name"]
     center_criterion = config["loss"]["discriminant_loss"](num_classes=class_num, feat_dim=config["network"]["params"]["bottleneck_dim"])
     loss_params = config["loss"]
@@ -84,12 +83,11 @@ def train(config):
     dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 64, shuffle = True, num_workers = 1)
     dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 64, shuffle = True, num_workers = 1)
 
-
     config['out_file'].write("dataset sizes: source={}, target={}\n".format(
         len(dsets["source"]), len(dsets["target"])))
 
     config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
-    config["early_stop_patience"] = len(dset_loaders["source"])*20
+    config["early_stop_patience"] = len(dset_loaders["source"])*10
     config["test_interval"] = len(dset_loaders["source"])
     config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
     config["log_iter"] = len(dset_loaders["source"])
@@ -108,7 +106,6 @@ def train(config):
     use_gpu = torch.cuda.is_available()
     if use_gpu:
         base_network = base_network.cuda()
-
 
     ## collect parameters
     if "DeepMerge" in args.net:
@@ -141,6 +138,9 @@ def train(config):
     schedule_param = optimizer_config["lr_param"]
     lr_scheduler = lr_schedule.schedule_dict[optimizer_config["lr_type"]]
 
+    scan_lr = []
+    scan_loss = []
+
     ## train   
     len_train_source = len(dset_loaders["source"])
     len_train_target = len(dset_loaders["target"])
@@ -151,6 +151,7 @@ def train(config):
     best_acc = 0.0
 
     for i in range(config["num_iterations"]):
+
         if i % config["test_interval"] == 0 and i != 0:
             base_network.train(False)
             if config['loss']['ly_type'] == "cosine":
@@ -175,6 +176,7 @@ def train(config):
                             'valid accuracy': temp_acc,
                             'train accuracy' : train_acc,
                             }
+
             snapshot_obj['center_criterion'] = center_criterion.state_dict()
 
             if (i+1) % config["snapshot_interval"] == 0:
@@ -193,10 +195,10 @@ def train(config):
             writer.add_scalar("validation accuracy", temp_acc, i/len(dset_loaders["source"]))
             writer.add_scalar("training accuracy", train_acc, i/len(dset_loaders["source"]))
 
-            if early_stop_engine.is_stop_training(temp_acc):
-                config["out_file"].write("no improvement after {}, stop training at epoch {}\n".format(
-                    config["early_stop_patience"], i/len(dset_loaders["source"])))
-                break
+            # if early_stop_engine.is_stop_training(temp_acc):
+            #     config["out_file"].write("no improvement after {}, stop training at epoch {}\n".format(
+            #         config["early_stop_patience"], i/len(dset_loaders["source"])))
+            #     break
 
         ## train one iter
         base_network.train(True)
@@ -206,6 +208,13 @@ def train(config):
 
         if config["optimizer"]["lr_type"] == "one-cycle":
             optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+
+        if config["optimizer"]["lr_type"] == "linear":
+            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+
+
+        optim = optimizer.state_dict()
+        scan_lr.append(optim['param_groups'][0]['lr'])
 
         optimizer.zero_grad()
 
@@ -253,6 +262,8 @@ def train(config):
              + fisher_loss \
              + loss_params["em_loss_coef"] * em_loss \
              + classifier_loss
+
+        scan_loss.append(total_loss.cpu().float().item())
         
         total_loss.backward()
 
@@ -269,6 +280,17 @@ def train(config):
         optimizer.step()
 
         if i % config["log_iter"] == 0 and i != 0:
+
+            if config['lr_scan'] != 'no':
+                if not osp.exists(osp.join(config["output_path"], "learning_rate_scan")):
+                    os.makedirs(osp.join(config["output_path"], "learning_rate_scan"))
+
+                plot_learning_rate_scan(scan_lr, scan_loss, i/len(dset_loaders["source"]), osp.join(config["output_path"], "learning_rate_scan"))
+
+                # print("Scanning learning rate at epoch: ", i/len(dset_loaders["source"]))
+                # print(scan_lr)
+                # print("Scanning total loss at epoch: ", i/len(dset_loaders["source"]))
+                # print(scan_loss)
 
             if config['grad_vis'] != 'no':
                 if not osp.exists(osp.join(config["output_path"], "gradients")):
@@ -360,7 +382,12 @@ def train(config):
                     writer.add_scalar("validation total fisher loss", fisher_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                     writer.add_scalar("validation intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                     writer.add_scalar("validation inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-                
+
+            if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
+                config["out_file"].write("no improvement after {}, stop training at epoch {}\n".format(
+                config["early_stop_patience"], i/len(dset_loaders["source"])))
+                break
+
     return best_acc
 
 
@@ -395,6 +422,7 @@ if __name__ == "__main__":
     parser.add_argument('--target_y_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy',
                          help="Target domain y-values filename")
     parser.add_argument('--one_cycle', type=str, default = 'one-cycle', help='Do you want to turn on one-cycle learning rate?')
+    parser.add_argument('--lr_scan', type=str, default = 'no', help='Set to yes for learning rate scan')
     
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -406,6 +434,7 @@ if __name__ == "__main__":
     config["output_path"] = args.output_dir
     config["optim_choice"] = args.optim_choice
     config["grad_vis"] = args.grad_vis
+    config['lr_scan'] = args.lr_scan
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
@@ -438,17 +467,17 @@ if __name__ == "__main__":
         config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.0005, "betas":(0.7,0.8), "weight_decay":0.01, \
                                 "amsgrad":False, "eps":1e-8}, \
                         "lr_type":"inv", "lr_param":{"init_lr":0.0005, "gamma":0.001, "power":0.75} }   
-
     else:
         config["optimizer"] = {"type":"SGD", "optim_params":{"lr":0.001, "momentum":0.9, \
                                "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
                                "lr_param":{"init_lr":0.005, "gamma":0.001, "power":0.75} }
+    
     if args.lr is not None:
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
 
-    #load dataset  
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1.0, "betas":(0.7,0.8), "weight_decay":0.0001, "amsgrad":True, "eps":1e-8}, \
+    if config["optim_choice"] == "Adam":
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1e-6, "betas":(0.7,0.8), "weight_decay":0.0001, "amsgrad":True, "eps":1e-8}, \
                         "lr_type":"inv", "lr_param":{"init_lr":0.0001, "gamma":0.001, "power":0.75} }
     else:
         config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
@@ -462,6 +491,13 @@ if __name__ == "__main__":
 
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
+ 
+    if args.lr_scan is not None:
+        config["optimizer"]["lr_type"] = "linear"
+        config["optimizer"]["optim_params"]["lr"] = 1e-6
+        config["optimizer"]["lr_param"]["init_lr"] = 1e-6
+        config["frozen lr"] = 1e-6
+        config["epochs"] = 5
         
     config["dataset"] = args.dset
     config["path"] = args.dset_path

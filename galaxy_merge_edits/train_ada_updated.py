@@ -21,6 +21,7 @@ from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 from galaxy_utils import EarlyStopping, distance_classification_test, image_classification_test, domain_cls_accuracy
 from import_and_normalize import array_to_tensor, update
+from visualize import plot_grad_flow, plot_learning_rate_scan
 
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
@@ -88,7 +89,7 @@ def train(config):
         len(dsets["source"]), len(dsets["target"])))
 
     config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
-    config["early_stop_patience"] = len(dset_loaders["source"])*20
+    config["early_stop_patience"] = len(dset_loaders["source"])*10
     config["test_interval"] = len(dset_loaders["source"])
     config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
     config["log_iter"] = len(dset_loaders["source"])
@@ -142,6 +143,8 @@ def train(config):
     schedule_param = optimizer_config["lr_param"]
     lr_scheduler = lr_schedule.schedule_dict[optimizer_config["lr_type"]]
 
+    scan_lr = []
+    scan_loss = []
 
     ## train   
     len_train_source = len(dset_loaders["source"])
@@ -197,11 +200,6 @@ def train(config):
             config["out_file"].flush()
             writer.add_scalar("validation accuracy", temp_acc, i/len(dset_loaders["source"]))
             writer.add_scalar("training accuracy", train_acc, i/len(dset_loaders["source"]))
-
-            if early_stop_engine.is_stop_training(temp_acc):
-                config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
-                    config["early_stop_patience"], i/len(dset_loaders["source"])))
-                break
         
         ## train one iter
         base_network.train(True)
@@ -211,6 +209,12 @@ def train(config):
 
         if config["optimizer"]["lr_type"] == "one-cycle":
             optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+
+        if config["optimizer"]["lr_type"] == "linear":
+            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+
+        optim = optimizer.state_dict()
+        scan_lr.append(optim['param_groups'][0]['lr'])
 
         optimizer.zero_grad()
 
@@ -255,17 +259,25 @@ def train(config):
             total_loss = loss_params["trade_off"] * transfer_loss \
             + classifier_loss
 
+            scan_loss.append(total_loss.cpu().float().item())
+
             total_loss.backward()
 
-#             if center_grad is not None:
-#                 # clear mmc_loss
-#                 center_criterion.centers.grad.zero_()
-#                 # Manually assign centers gradients other than using autograd
-#                 center_criterion.centers.backward(center_grad)
+            # if center_grad is not None:
+            #     # clear mmc_loss
+            #     center_criterion.centers.grad.zero_()
+            #     # Manually assign centers gradients other than using autograd
+            #     center_criterion.centers.backward(center_grad)
 
             optimizer.step()
 
             if i % config["log_iter"] == 0 and i != 0:
+
+                if config['lr_scan'] != 'no':
+                    if not osp.exists(osp.join(config["output_path"], "learning_rate_scan")):
+                        os.makedirs(osp.join(config["output_path"], "learning_rate_scan"))
+
+                    plot_learning_rate_scan(scan_lr, scan_loss, i/len(dset_loaders["source"]), osp.join(config["output_path"], "learning_rate_scan"))
 
                 if config['grad_vis'] != 'no':
                     if not osp.exists(osp.join(config["output_path"], "gradients")):
@@ -344,7 +356,11 @@ def train(config):
                         writer.add_scalar("validation source+target domain accuracy", ad_acc, i/len(dset_loaders["source"]))
                         writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                         writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
-                    
+
+                if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
+                    config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
+                    config["early_stop_patience"], i/len(dset_loaders["source"])))
+                    break    
 
         else:       
             fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=config["loss"]["inter_type"], 
@@ -357,6 +373,8 @@ def train(config):
                          + fisher_loss \
                          + loss_params["em_loss_coef"] * em_loss \
                          + classifier_loss
+        
+            scan_loss.append(total_loss.cpu().float().item())
 
             total_loss.backward()
 
@@ -369,6 +387,12 @@ def train(config):
             optimizer.step()
 
             if i % config["log_iter"] == 0 and i != 0:
+
+                if config['lr_scan'] != 'no':
+                    if not osp.exists(osp.join(config["output_path"], "learning_rate_scan")):
+                        os.makedirs(osp.join(config["output_path"], "learning_rate_scan"))
+
+                    plot_learning_rate_scan(scan_lr, scan_loss, i/len(dset_loaders["source"]), osp.join(config["output_path"], "learning_rate_scan"))
 
                 if config['grad_vis'] != 'no':
                     if not osp.exists(osp.join(config["output_path"], "gradients")):
@@ -475,6 +499,11 @@ def train(config):
                         writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                         writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
+                if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
+                    config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
+                    config["early_stop_patience"], i/len(dset_loaders["source"])))
+                    break
+
     return best_acc
 
 if __name__ == "__main__":
@@ -508,6 +537,7 @@ if __name__ == "__main__":
     parser.add_argument('--target_y_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy',
                          help="Target domain y-values filename")
     parser.add_argument('--one_cycle', type=str, default = 'one-cycle', help='Do you want to turn on one-cycle learning rate?')
+    parser.add_argument('--lr_scan', type=str, default = 'no', help='Set to yes for learning rate scan')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -521,6 +551,7 @@ if __name__ == "__main__":
     config["optim_choice"] = args.optim_choice
     config["fisher_or_no"] = args.fisher_or_no
     config["grad_vis"] = args.grad_vis
+    config['lr_scan'] = args.lr_scan
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
@@ -562,6 +593,13 @@ if __name__ == "__main__":
 
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
+
+    if args.lr_scan is not None:
+        config["optimizer"]["lr_type"] = "linear"
+        config["optimizer"]["optim_params"]["lr"] = 1e-6
+        config["optimizer"]["lr_param"]["init_lr"] = 1e-6
+        config["frozen lr"] = 1e-6
+        config["epochs"] = 5
 
     config["dataset"] = args.dset
     config["path"] = args.dset_path
