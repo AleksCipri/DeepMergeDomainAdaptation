@@ -1,5 +1,3 @@
-
-from onecyclelr import OneCycleLR
 import numpy as np
 
 def inv_lr_scheduler(param_lr, optimizer, iter_num, epoch_length, lr_extra, gamma, power, init_lr=0.001, weight_decay=5e-4):
