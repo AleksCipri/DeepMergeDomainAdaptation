@@ -1,6 +1,6 @@
 import numpy as np
 
-def inv_lr_scheduler(param_lr, optimizer, iter_num, epoch_length, lr_extra, gamma, power, init_lr=0.001, weight_decay=5e-4):
+def inv_lr_scheduler(param_lr, optimizer, iter_num, epoch_length, extra_lr, extra_cycle, gamma, power, init_lr=0.001, weight_decay=5e-4):
 	"""Decay learning rate by a factor of 0.1 every lr_decay_epoch epochs."""
 	lr = init_lr * (1 + gamma * iter_num) ** (-power)
 	i=0
@@ -11,21 +11,10 @@ def inv_lr_scheduler(param_lr, optimizer, iter_num, epoch_length, lr_extra, gamm
 
 	return optimizer
 
-# def cycle1(param_lr, optimizer, iter_num, epoch_length, lr, **kwargs):
-# #steps might be the number to go from min to max lr
-
-# 	optim_dict = optimizer.state_dict()
-
-# 	#print(optim_dict)
-
-# 	scheduler = OneCycleLR(optimizer, num_steps = epoch_length, lr_range = (lr, 10*lr))
-	
-# 	return scheduler
-
-def cycle1(param_lr, optimizer, iter_num, epoch_length, lr, **kwargs):
-	min_lr = lr
-	max_lr = 10*lr
-	num_steps = epoch_length
+def cycle1(param_lr, optimizer, iter_num, epoch_length, lr, cycle_length, **kwargs):
+	min_lr = lr/10
+	max_lr = lr
+	num_steps = cycle_length*epoch_length
 	annihilation_frac = .1
 	reduce_factor = .01
 	num_cycle_steps = int(num_steps * (1. - annihilation_frac)) 
@@ -80,7 +69,7 @@ def linear_to_find_baseline(param_lr, optimizer, iter_num, epoch_length, lr, **k
 	# max_lr = 1000*lr
 	num_epochs = 5
 	# lr_spectrum = np.arange(min_lr, num_epochs, max_lr)
-	lr_spectrum = np.linspace(1e-6, 1, 85*num_epochs+1)
+	lr_spectrum = np.linspace(1e-6, 1e-2, 85*num_epochs+1)
 	num_steps = epoch_length
 
 	#on_step = iter_num//epoch_length

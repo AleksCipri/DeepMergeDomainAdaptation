@@ -171,10 +171,10 @@ def train(config):
         base_network.train(True)
 
         if i % config["log_iter"] == 0:
-            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], config["cycle_length"], **schedule_param)
 
         if config["optimizer"]["lr_type"] == "one-cycle":
-            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], config["cycle_length"], **schedule_param)
 
         if config["optimizer"]["lr_type"] == "linear":
             optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
@@ -295,6 +295,7 @@ if __name__ == "__main__":
                          help="Source domain y-values filename")
     parser.add_argument('--one_cycle', type=str, default = 'one-cycle', help='Do you want to turn on one-cycle learning rate?')
     parser.add_argument('--lr_scan', type=str, default = 'no', help='Set to yes for learning rate scan')
+    parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -307,6 +308,7 @@ if __name__ == "__main__":
     config["optim_choice"] = args.optim_choice
     config["grad_vis"] = args.grad_vis
     config['lr_scan'] = args.lr_scan
+    config['cycle_length'] = args.cycle_length
 
     if not osp.exists(config["output_path"]):
         os.makedirs(osp.join(config["output_path"]))
@@ -345,7 +347,7 @@ if __name__ == "__main__":
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
 
-    if args.lr_scan is not None:
+    if args.lr_scan == "yes":
         config["optimizer"]["lr_type"] = "linear"
         config["optimizer"]["optim_params"]["lr"] = 1e-6
         config["optimizer"]["lr_param"]["init_lr"] = 1e-6
