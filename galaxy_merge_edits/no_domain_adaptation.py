@@ -62,7 +62,6 @@ def train(config):
         len(dsets["source"])))
 
     config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
-    config["early_stop_patience"] = len(dset_loaders["source"])*10
     config["test_interval"] = len(dset_loaders["source"])
     config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
     config["log_iter"] = len(dset_loaders["source"])
@@ -219,7 +218,6 @@ def train(config):
 
                 plot_learning_rate_scan(scan_lr, scan_loss, i/len(dset_loaders["source"]), osp.join(config["output_path"], "learning_rate_scan"))
 
-
             if config['grad_vis'] != 'no':
                 if not osp.exists(osp.join(config["output_path"], "gradients")):
                     os.makedirs(osp.join(config["output_path"], "gradients"))
@@ -267,11 +265,11 @@ def train(config):
                     writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                     writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
             
-            if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
-                config["out_file"].write("overfitting after {}, stop training at epoch {}\n".format(
-                    config["early_stop_patience"], i/len(dset_loaders["source"])))
-                # config["out_file"].write("finish training! \n")
-                break
+                    if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
+                        config["out_file"].write("overfitting after {}, stop training at epoch {}\n".format(
+                            config["early_stop_patience"], i/len(dset_loaders["source"])))
+                        # config["out_file"].write("finish training! \n")
+                        break
 
     return best_acc
 
@@ -296,6 +294,7 @@ if __name__ == "__main__":
     parser.add_argument('--one_cycle', type=str, default = 'one-cycle', help='Do you want to turn on one-cycle learning rate?')
     parser.add_argument('--lr_scan', type=str, default = 'no', help='Set to yes for learning rate scan')
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
+    parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -307,8 +306,9 @@ if __name__ == "__main__":
     config["output_path"] = args.output_dir
     config["optim_choice"] = args.optim_choice
     config["grad_vis"] = args.grad_vis
-    config['lr_scan'] = args.lr_scan
-    config['cycle_length'] = args.cycle_length
+    config["lr_scan"] = args.lr_scan
+    config["cycle_length"] = args.cycle_length
+    config["early_stop_patience"] = args.early_stop_patience
 
     if not osp.exists(config["output_path"]):
         os.makedirs(osp.join(config["output_path"]))
