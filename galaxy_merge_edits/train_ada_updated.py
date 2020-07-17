@@ -89,7 +89,6 @@ def train(config):
         len(dsets["source"]), len(dsets["target"])))
 
     config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
-    config["early_stop_patience"] = len(dset_loaders["source"])*10
     config["test_interval"] = len(dset_loaders["source"])
     config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
     config["log_iter"] = len(dset_loaders["source"])
@@ -357,10 +356,10 @@ def train(config):
                         writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                         writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
-                if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
-                    config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
-                    config["early_stop_patience"], i/len(dset_loaders["source"])))
-                    break    
+                        if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
+                            config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
+                            config["early_stop_patience"], i/len(dset_loaders["source"])))
+                            break    
 
         else:       
             fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=config["loss"]["inter_type"], 
@@ -499,10 +498,10 @@ def train(config):
                         writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                         writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
-                if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
-                    config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
-                    config["early_stop_patience"], i/len(dset_loaders["source"])))
-                    break
+                        if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
+                            config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
+                            config["early_stop_patience"], i/len(dset_loaders["source"])))
+                            break
 
     return best_acc
 
@@ -539,7 +538,7 @@ if __name__ == "__main__":
     parser.add_argument('--one_cycle', type=str, default = 'one-cycle', help='Do you want to turn on one-cycle learning rate?')
     parser.add_argument('--lr_scan', type=str, default = 'no', help='Set to yes for learning rate scan')
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
-
+    parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -553,8 +552,9 @@ if __name__ == "__main__":
     config["optim_choice"] = args.optim_choice
     config["fisher_or_no"] = args.fisher_or_no
     config["grad_vis"] = args.grad_vis
-    config['lr_scan'] = args.lr_scan
-    config['cycle_length'] = args.cycle_length
+    config["lr_scan"] = args.lr_scan
+    config["cycle_length"] = args.cycle_length
+    config["early_stop_patience"] = args.early_stop_patience
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])

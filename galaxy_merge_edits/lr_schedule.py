@@ -63,7 +63,7 @@ def cycle1(param_lr, optimizer, iter_num, epoch_length, lr, cycle_length, **kwar
 	return optimizer
 
 
-def linear_to_find_baseline(param_lr, optimizer, iter_num, epoch_length, lr, **kwargs):
+def linear_to_find_baseline(param_lr, optimizer, iter_num, epoch_length, lr, extra_cycle, **kwargs):
 
 	# min_lr = lr/1000
 	# max_lr = 1000*lr
