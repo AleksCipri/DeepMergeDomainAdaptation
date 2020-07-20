@@ -6,6 +6,7 @@ nohup python2 train_pada.py --gpu_id 1 --net ResNet50 --dset office --s_dset_pat
 import argparse
 import os
 import os.path as osp
+import sys
 import numpy as np
 import torch
 import torch.nn as nn
@@ -194,11 +195,6 @@ def train(config):
             writer.add_scalar("validation accuracy", temp_acc, i/len(dset_loaders["source"]))
             writer.add_scalar("training accuracy", train_acc, i/len(dset_loaders["source"]))
 
-            # if early_stop_engine.is_stop_training(temp_acc):
-            #     config["out_file"].write("no improvement after {}, stop training at epoch {}\n".format(
-            #         config["early_stop_patience"], i/len(dset_loaders["source"])))
-            #     break
-
         ## train one iter
         base_network.train(True)
 
@@ -220,6 +216,7 @@ def train(config):
         try:
             inputs_source, labels_source = iter(dset_loaders["source"]).next()
             inputs_target, labels_target = iter(dset_loaders["target"]).next()
+
         except StopIteration:
             iter(dset_loaders["source"])
             iter(dset_loaders["target"])
@@ -242,10 +239,6 @@ def train(config):
             features, _ = base_network(inputs)
             logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
             source_logits = logits.narrow(0, 0, source_batch_size)
-
-        #learning function
-        # print("train source", features[:source_batch_size].size())
-        # print("train target", features[source_batch_size:].size())
 
         transfer_loss = transfer_criterion(features[:source_batch_size], features[source_batch_size:])
 
@@ -272,10 +265,6 @@ def train(config):
             # Manually assign centers gradients other than using autograd
             center_criterion.centers.backward(center_grad)
 
-        # if config["optimizer"]["lr_type"] == "one-cycle":
-        #     scheduler.step()
-        #     optimizer.step()
-        # else:
         optimizer.step()
 
         if i % config["log_iter"] == 0 and i != 0:
@@ -285,11 +274,6 @@ def train(config):
                     os.makedirs(osp.join(config["output_path"], "learning_rate_scan"))
 
                 plot_learning_rate_scan(scan_lr, scan_loss, i/len(dset_loaders["source"]), osp.join(config["output_path"], "learning_rate_scan"))
-
-                # print("Scanning learning rate at epoch: ", i/len(dset_loaders["source"]))
-                # print(scan_lr)
-                # print("Scanning total loss at epoch: ", i/len(dset_loaders["source"]))
-                # print(scan_loss)
 
             if config['grad_vis'] != 'no':
                 if not osp.exists(osp.join(config["output_path"], "gradients")):
@@ -345,9 +329,6 @@ def train(config):
                         logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
                         source_logits = logits.narrow(0, 0, valid_source_batch_size)
 
-                    # print("valid source", features[:valid_source_batch_size].size())
-                    # print("valid target", features[valid_source_batch_size:].size())
-
                     transfer_loss = transfer_criterion(features[:valid_source_batch_size], features[valid_source_batch_size:])
 
                     # source domain classification task loss
@@ -385,7 +366,8 @@ def train(config):
                     if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
                         config["out_file"].write("no improvement after {}, stop training at epoch {}\n".format(
                         config["early_stop_patience"], i/len(dset_loaders["source"])))
-                        break
+
+                        sys.exit()
 
     return best_acc
 
@@ -424,6 +406,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr_scan', type=str, default = 'no', help='Set to yes for learning rate scan')
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
+    parser.add_argument('--weight_decay', type=int, default = 5e-4, help= 'How much do you want to penalize large weights?')
 
     
     args = parser.parse_args()
@@ -439,6 +422,7 @@ if __name__ == "__main__":
     config["lr_scan"] = args.lr_scan
     config["cycle_length"] = args.cycle_length
     config["early_stop_patience"] = args.early_stop_patience
+    config["weight_decay"] = args.weight_decay
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
@@ -466,26 +450,12 @@ if __name__ == "__main__":
         config["network"] = {"name":network.ResNetFc, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
 
-    #set optimizer
-    if config["optim_choice"] == 'Adam':
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.0005, "betas":(0.7,0.8), "weight_decay":0.01, \
-                                "amsgrad":False, "eps":1e-8}, \
-                        "lr_type":"inv", "lr_param":{"init_lr":0.0005, "gamma":0.001, "power":0.75} }   
-    else:
-        config["optimizer"] = {"type":"SGD", "optim_params":{"lr":0.001, "momentum":0.9, \
-                               "weight_decay":0.0005, "nesterov":True}, "lr_type":"inv", \
-                               "lr_param":{"init_lr":0.005, "gamma":0.001, "power":0.75} }
-    
-    if args.lr is not None:
-        config["optimizer"]["optim_params"]["lr"] = args.lr
-        config["optimizer"]["lr_param"]["init_lr"] = args.lr
-
     if config["optim_choice"] == "Adam":
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1e-6, "betas":(0.7,0.8), "weight_decay":0.0001, "amsgrad":True, "eps":1e-8}, \
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1e-6, "betas":(0.7,0.8), "weight_decay": config["weight_decay"], "amsgrad":True, "eps":1e-8}, \
                         "lr_type":"inv", "lr_param":{"init_lr":0.0001, "gamma":0.001, "power":0.75} }
     else:
         config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
-                               "weight_decay":0.0001, "nesterov":True}, "lr_type":"inv", \
+                               "weight_decay": config["weight_decay"], "nesterov":True}, "lr_type":"inv", \
                                "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
 
     if args.lr is not None:

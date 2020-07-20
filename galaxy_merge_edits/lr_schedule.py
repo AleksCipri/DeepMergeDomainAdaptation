@@ -69,7 +69,7 @@ def linear_to_find_baseline(param_lr, optimizer, iter_num, epoch_length, lr, ext
 	# max_lr = 1000*lr
 	num_epochs = 5
 	# lr_spectrum = np.arange(min_lr, num_epochs, max_lr)
-	lr_spectrum = np.linspace(1e-6, 1e-2, 85*num_epochs+1)
+	lr_spectrum = np.linspace(1e-2, 1, 85*num_epochs+1)
 	num_steps = epoch_length
 
 	#on_step = iter_num//epoch_length
