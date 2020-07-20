@@ -6,6 +6,7 @@ nohup python2 train_pada.py --gpu_id 1 --net ResNet50 --dset office --s_dset_pat
 import argparse
 import os
 import os.path as osp
+import sys
 import numpy as np
 import torch
 import torch.nn as nn
@@ -160,12 +161,6 @@ def train(config):
             writer.add_scalar("validation accuracy", temp_acc, i/len(dset_loaders["source"]))
             writer.add_scalar("training accuracy", train_acc, i/len(dset_loaders["source"]))
 
-            # if early_stop_engine.is_stop_training(temp_acc):
-            #     config["out_file"].write("no improvement after {}, stop training at epoch {}\n".format(
-            #         config["early_stop_patience"], i/len(dset_loaders["source"])))
-            #     # config["out_file"].write("finish training! \n")
-            #     break
-
         ## train one iter
         base_network.train(True)
 
@@ -268,8 +263,8 @@ def train(config):
                     if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
                         config["out_file"].write("overfitting after {}, stop training at epoch {}\n".format(
                             config["early_stop_patience"], i/len(dset_loaders["source"])))
-                        # config["out_file"].write("finish training! \n")
-                        break
+
+                        sys.exit()
 
     return best_acc
 
@@ -295,6 +290,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr_scan', type=str, default = 'no', help='Set to yes for learning rate scan')
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
+    parser.add_argument('--weight_decay', type=int, default = 5e-4, help= 'How much do you want to penalize large weights?')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -309,6 +305,8 @@ if __name__ == "__main__":
     config["lr_scan"] = args.lr_scan
     config["cycle_length"] = args.cycle_length
     config["early_stop_patience"] = args.early_stop_patience
+    config["weight_decay"] = args.weight_decay
+
 
     if not osp.exists(config["output_path"]):
         os.makedirs(osp.join(config["output_path"]))
@@ -330,12 +328,12 @@ if __name__ == "__main__":
     
     #set optimizer
     if config["optim_choice"] == 'Adam':
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.8), "weight_decay":0.01, \
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.8), "weight_decay":config["weight_decay"], \
                                  "amsgrad":False, "eps":1e-8} , \
                         "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75}}
     else:
         config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
-                               "weight_decay":0.005, "nesterov":True}, "lr_type":"inv" , \
+                               "weight_decay": config["weight_decay"], "nesterov":True}, "lr_type":"inv" , \
                                "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75}}
 
     #override default if it is specified
