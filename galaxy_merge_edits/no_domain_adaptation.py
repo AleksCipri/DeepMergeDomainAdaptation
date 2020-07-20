@@ -176,7 +176,7 @@ def train(config):
             optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], config["cycle_length"], **schedule_param)
 
         if config["optimizer"]["lr_type"] == "linear":
-            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], **schedule_param)
+            optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], config["cycle_length"], **schedule_param)
 
         optim = optimizer.state_dict()
         scan_lr.append(optim['param_groups'][0]['lr'])
