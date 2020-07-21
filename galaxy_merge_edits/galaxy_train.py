@@ -156,18 +156,14 @@ def train(config):
             base_network.train(False)
             if config['loss']['ly_type'] == "cosine":
                 temp_acc, _ = image_classification_test(dset_loaders, 'source_valid', \
-                    base_network, \
-                    gpu=use_gpu)
+                    base_network, gpu=use_gpu, verbose = False, save_where = None)
                 train_acc, _ = image_classification_test(dset_loaders, 'source', \
-                    base_network, \
-                    gpu=use_gpu)
+                    base_network, gpu=use_gpu, verbose = False, save_where = None)
             elif config['loss']['ly_type'] == "euclidean":
                 temp_acc, _ = distance_classification_test(dset_loaders, 'source_valid', \
-                    base_network, center_criterion.centers.detach(), \
-                    gpu=use_gpu)
+                    base_network, center_criterion.centers.detach(), gpu=use_gpu, verbose = False, save_where = None)
                 train_acc, _ = distance_classification_test(dset_loaders, 'source', \
-                    base_network, \
-                    gpu=use_gpu)
+                    base_network, center_criterion.centers.detach(), gpu=use_gpu, verbose = False, save_where = None)
             else:
                 raise ValueError("no test method for cls loss: {}".format(config['loss']['ly_type']))
             

@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import os.path as os
+import pandas as pd
 from sklearn.metrics import confusion_matrix
 from collections import deque
 
@@ -83,8 +85,7 @@ def distance_to_centroids(x, centroids):
     dist = x.unsqueeze(1).expand(b, K, d) - centroids.unsqueeze(0).expand(b, K, d)
     return torch.norm(dist, dim=-1)
 
-
-def distance_classification_test(loader, dictionary_val, model, centroids, gpu=True):
+def distance_classification_test(loader, dictionary_val, model, centroids, gpu=True, verbose = False, save_where = None):
     start_test = True
     with torch.no_grad():
         # if test_10crop:
@@ -134,9 +135,25 @@ def distance_classification_test(loader, dictionary_val, model, centroids, gpu=T
     _, predict = torch.max(all_output, 1)
     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).float() / float(all_label.size()[0])
     conf_matrix = confusion_matrix(all_label.cpu().numpy(), predict.cpu().numpy())
+
+    if verbose:
+
+        output = pd.DataFrame()
+
+        # print("all output")
+        # print(torch.max(all_output, 1)[1].cpu().detach().numpy())
+        # print()
+        # print("all label")
+        # print(all_label.cpu().detach().numpy())
+
+        output['model output'] = pd.Series(torch.max(all_output, 1)[1].cpu().detach().numpy())
+        output['labels'] = pd.Series(all_label.cpu().detach().numpy())
+
+        output.to_csv(str(save_where)+"/model_results.csv")
+
     return accuracy, conf_matrix
 
-def image_classification_test(loader, dictionary_val, model, gpu=True):
+def image_classification_test(loader, dictionary_val, model, gpu=True, verbose = False, save_where = None):
     start_test = True
     with torch.no_grad():
         # if test_10crop:
@@ -182,6 +199,22 @@ def image_classification_test(loader, dictionary_val, model, gpu=True):
     _, predict = torch.max(all_output, 1)
     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).float() / float(all_label.size()[0])
     conf_matrix = confusion_matrix(all_label.cpu().numpy(), predict.cpu().numpy())
+
+    if verbose:
+
+        output = pd.DataFrame()
+
+        # print("all output")
+        # print(torch.max(all_output, 1)[1].cpu().detach().numpy())
+        # print()
+        # print("all label")
+        # print(all_label.cpu().detach().numpy())
+
+        output['model output'] = pd.Series(torch.max(all_output, 1)[1].cpu().detach().numpy())
+        output['labels'] = pd.Series(all_label.cpu().detach().numpy())
+
+        output.to_csv(str(save_where)+"/model_results.csv")
+
     return accuracy, conf_matrix
 
 def image_classification_predict(loader, dictionary_val, model, gpu=True, softmax_param=1.0):

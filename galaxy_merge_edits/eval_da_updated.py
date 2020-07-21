@@ -37,55 +37,54 @@ def test(config):
     #sampling WOR, i guess we leave the 10 in the middle to validate?
     pristine_indices = torch.randperm(len(pristine_x))
     #train
-    pristine_x_train = pristine_x[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
-    pristine_y_train = pristine_y[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
-    #validate --- gets passed into test functions in train file
-    pristine_x_valid = pristine_x[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
-    pristine_y_valid = pristine_y[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
+    # pristine_x_train = pristine_x[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
+    # pristine_y_train = pristine_y[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
+    # #validate --- gets passed into test functions in train file
+    # pristine_x_valid = pristine_x[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
+    # pristine_y_valid = pristine_y[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
     #test for evaluation file
     pristine_x_test = pristine_x[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
     pristine_y_test = pristine_y[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
 
     noisy_indices = torch.randperm(len(noisy_x))
     #train
-    noisy_x_train = noisy_x[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
-    noisy_y_train = noisy_y[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
-    #validate --- gets passed into test functions in train file
-    noisy_x_valid = noisy_x[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
-    noisy_y_valid = noisy_y[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
+    # noisy_x_train = noisy_x[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
+    # noisy_y_train = noisy_y[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
+    # #validate --- gets passed into test functions in train file
+    # noisy_x_valid = noisy_x[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
+    # noisy_y_valid = noisy_y[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
     #test for evaluation file
     noisy_x_test = noisy_x[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
     noisy_y_test = noisy_y[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
 
 
-    dsets["source"] = TensorDataset(pristine_x_train, pristine_y_train)
-    dsets["target"] = TensorDataset(noisy_x_train, noisy_y_train)
+    # dsets["source"] = TensorDataset(pristine_x_train, pristine_y_train)
+    # dsets["target"] = TensorDataset(noisy_x_train, noisy_y_train)
 
-    dsets["source_valid"] = TensorDataset(pristine_x_valid, pristine_y_valid)
-    dsets["target_valid"] = TensorDataset(noisy_x_valid, noisy_y_valid)
+    # dsets["source_valid"] = TensorDataset(pristine_x_valid, pristine_y_valid)
+    # dsets["target_valid"] = TensorDataset(noisy_x_valid, noisy_y_valid)
 
     dsets["source_test"] = TensorDataset(pristine_x_test, pristine_y_test)
     dsets["target_test"] = TensorDataset(noisy_x_test, noisy_y_test)
 
     #put your dataloaders here
     #i stole batch size numbers from below
-    dset_loaders["source"] = DataLoader(dsets["source"], batch_size =128, shuffle = True, num_workers = 1)
-    dset_loaders["target"] = DataLoader(dsets["target"], batch_size = 128, shuffle = True, num_workers = 1)
+    # dset_loaders["source"] = DataLoader(dsets["source"], batch_size =128, shuffle = True, num_workers = 1)
+    # dset_loaders["target"] = DataLoader(dsets["target"], batch_size = 128, shuffle = True, num_workers = 1)
 
     #guessing batch size based on what was done for testing in the original file
-    dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 64, shuffle = True, num_workers = 1)
-    dset_loaders["target_valid"] = DataLoader(dsets["target_valid"], batch_size = 64, shuffle = True, num_workers = 1)
+    # dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 64, shuffle = True, num_workers = 1)
+    # dset_loaders["target_valid"] = DataLoader(dsets["target_valid"], batch_size = 64, shuffle = True, num_workers = 1)
 
     dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 64, shuffle = True, num_workers = 1)
     dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 64, shuffle = True, num_workers = 1)
-
 
     class_num = config["network"]["params"]["class_num"]
 
     # load checkpoint
     print('load model from {}'.format(config['ckpt_path']))
 
-    ckpt = torch.load(config['ckpt_path'])
+    ckpt = torch.load(config['ckpt_path']+'/best_model.pth.tar')
     print('recorded best training accuracy: {:0.4f} at epoch {}'.format(ckpt["train accuracy"], ckpt["epoch"]))
     print('recorded best validation accuracy: {:04f} at epoch {}'.format(ckpt["valid accuracy"], ckpt["epoch"]))
 
@@ -112,11 +111,9 @@ def test(config):
     base_network.train(False)
     if config["ly_type"] == 'cosine':
         source_test_acc, source_test_confusion_matrix = image_classification_test(dset_loaders, "source_test", \
-            base_network, \
-            gpu=use_gpu)
+            base_network, gpu=use_gpu, verbose = True, save_where = config['ckpt_path'])
         target_test_acc, target_test_confusion_matrix = image_classification_test(dset_loaders, "target_test", \
-            base_network, \
-            gpu=use_gpu)
+            base_network, gpu=use_gpu, verbose = True, save_where = config['ckpt_path'])
 
     elif config["ly_type"] == "euclidean":
         eval_centroids = None
@@ -125,11 +122,9 @@ def test(config):
         if target_centroids is not None:
             eval_centroids = target_centroids
         source_test_acc, source_test_confusion_matrix = distance_classification_test(dset_loaders, "source_test", \
-            base_network, eval_centroids, \
-            gpu=use_gpu)
+            base_network, eval_centroids, gpu=use_gpu, verbose = True, save_where = config['ckpt_path'])
         target_test_acc, target_test_confusion_matrix = distance_classification_test(dset_loaders, "target_test", \
-            base_network, eval_centroids, \
-            gpu=use_gpu)
+            base_network, eval_centroids, gpu=use_gpu, verbose = True, save_where = config['ckpt_path'])
 
     # save train/test accuracy as pkl file
     #why do we want this in a pkl file?
