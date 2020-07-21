@@ -128,11 +128,9 @@ def train(config):
             base_network.train(False)
             if config['loss']['ly_type'] == "cosine":
                 temp_acc, _ = image_classification_test(dset_loaders, 'source_valid', \
-                    base_network, \
-                    gpu=use_gpu)
+                    base_network, gpu=use_gpu, verbose = False, save_where = None)
                 train_acc, _ = image_classification_test(dset_loaders, 'source', \
-                    base_network, \
-                    gpu=use_gpu)
+                    base_network, gpu=use_gpu, verbose = False, save_where = None)
             elif config['loss']['ly_type'] == 'euclidean':
                 print('You cannot use the euclidean distance loss because it involves the target domain')
             else:
