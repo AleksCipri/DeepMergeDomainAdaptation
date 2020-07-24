@@ -152,7 +152,7 @@ def train(config):
 
     for i in range(config["num_iterations"]):
 
-        if i % config["test_interval"] == 0 and i != 0:
+        if i % config["test_interval"] == 0:
             base_network.train(False)
             if config['loss']['ly_type'] == "cosine":
                 temp_acc, _ = image_classification_test(dset_loaders, 'source_valid', \
@@ -263,7 +263,7 @@ def train(config):
 
         optimizer.step()
 
-        if i % config["log_iter"] == 0 and i != 0:
+        if i % config["log_iter"] == 0:
 
             if config['lr_scan'] != 'no':
                 if not osp.exists(osp.join(config["output_path"], "learning_rate_scan")):
@@ -398,7 +398,7 @@ if __name__ == "__main__":
                          help="Target domain x-values filename")
     parser.add_argument('--target_y_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy',
                          help="Target domain y-values filename")
-    parser.add_argument('--one_cycle', type=str, default = 'one-cycle', help='Do you want to turn on one-cycle learning rate?')
+    parser.add_argument('--one_cycle', type=str, default = None, help='Do you want to turn on one-cycle learning rate?')
     parser.add_argument('--lr_scan', type=str, default = 'no', help='Set to yes for learning rate scan')
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')

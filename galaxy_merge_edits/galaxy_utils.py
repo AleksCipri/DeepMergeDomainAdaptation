@@ -31,24 +31,21 @@ class EarlyStopping(object):
         if self.best_score is None:
             self.best_score = score
 
-        elif score > self.best_score: #guessing i just flip the sign since we want to minimize val classification loss instead of maximizing val accuracy
+        elif score < self.best_score:
+            self.best_score = score
+        elif score - self.best_score >= .4:
             self.counter += 1
+        elif .3 <= score - self.best_score < .4:
+            self.counter += .50
+        elif .2 <= score - self.best_score < .3:
+            self.counter += .25
+        elif .1 <= score - self.best_score < .2:   
+            self.counter += .1
+        elif score - self.best_score <.1:
+            self.counter = self.counter
 
-            # print("loss is greater than previous loss")
-        # approximately equal
-        # elif np.abs(score.cpu() - self.best_score) < 1e-9:
-        #     if len(self.meter) == self.patience and np.abs(np.mean([x.item() for x in self.meter]) - score.cpu()) < 1e-7:
-        elif np.abs(score - self.best_score) < 1e-5:
-            if len(self.meter) == self.patience and np.abs(np.mean([x for x in self.meter]) - score) < 1e-7:
-                stop_sign = True
-            else:
-                self.best_score = score #score.cpu()
-                self.counter = 0
-        else:
-            self.best_score = score #score.cpu()
-            self.counter = 0
-
-        if self.counter >= self.patience:
+        if self.counter > self.patience:
+            print("counter is greater than patience)")
             stop_sign = True
 
         return stop_sign
