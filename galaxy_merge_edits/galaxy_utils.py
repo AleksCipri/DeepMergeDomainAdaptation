@@ -45,7 +45,7 @@ class EarlyStopping(object):
             self.counter = self.counter
 
         if self.counter > self.patience:
-            print("counter is greater than patience)")
+            print("counter is greater than patience")
             stop_sign = True
 
         return stop_sign
@@ -66,6 +66,9 @@ def domain_cls_accuracy(d_out):
     d0_acc = float(d0_pred.data.cpu().float().eq(d0_target).sum()) / float(d_out.size(0))
     source_acc = float(d0_pred[:batch_size].cpu().float().eq(d0_target[:batch_size]).sum()) / float(batch_size)
     target_acc = float(d0_pred[batch_size:].cpu().float().eq(d0_target[batch_size:]).sum()) / float(batch_size)
+
+    d0_loss = 
+    
     return d0_acc, source_acc, target_acc
 
 

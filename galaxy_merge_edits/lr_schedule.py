@@ -2,10 +2,10 @@ import numpy as np
 
 def inv_lr_scheduler(param_lr, optimizer, iter_num, epoch_length, extra_lr, extra_cycle, gamma, power, init_lr=0.001, weight_decay=5e-4):
 	"""Decay learning rate by a factor of 0.1 every lr_decay_epoch epochs."""
-	lr = init_lr #* (1 + gamma * iter_num) ** (-power)
+	lr = init_lr * (1 + gamma * iter_num) ** (-power)
 	i=0
 	for param_group in optimizer.param_groups:
-		param_group['lr'] = lr #* param_group['lr_mult']
+		param_group['lr'] = lr * param_group['lr_mult']
 		#param_group['weight_decay'] = 1 * param_group['decay_mult']
 		i+=1
 
