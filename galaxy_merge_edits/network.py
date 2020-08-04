@@ -146,8 +146,6 @@ class DeepMerge(nn.Module):
         return self.__in_features
 
 
-
-
 class AdversarialNetwork(nn.Module):
   def __init__(self, in_feature):
     super(AdversarialNetwork, self).__init__()
