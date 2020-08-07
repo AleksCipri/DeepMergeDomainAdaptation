@@ -21,7 +21,7 @@ def cycle1(param_lr, optimizer, iter_num, epoch_length, lr, cycle_length, **kwar
 
 	optim_dict = optimizer.state_dict()
 	
-	# print(optim_dict)
+	#print(optim_dict)
 
 	if 'momentum' in optim_dict['param_groups'][0]:
 		momentum = optim_dict['param_groups'][0]['momentum']
@@ -55,7 +55,8 @@ def cycle1(param_lr, optimizer, iter_num, epoch_length, lr, cycle_length, **kwar
 		momentum = 0
 
 	for param_group in optimizer.param_groups:
-		param_group['lr'] = lr
+		factor = param_group['lr_mult']
+		param_group['lr'] = lr*factor
 
 		if momentum is not None:
 			param_group['momentum'] = momentum
