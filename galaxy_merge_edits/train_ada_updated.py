@@ -131,16 +131,16 @@ def train(config):
             parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
                             {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \
                             {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-            parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
+            parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
             parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
         else:
             parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
                             {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-            parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
+            parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
             parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
     else:
         parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
+        parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
         parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
     #Should I put lr_mult here as 1 for DeepMerge too? Probably!
  
@@ -550,6 +550,9 @@ if __name__ == "__main__":
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
     parser.add_argument('--weight_decay', type=float, default = 5e-4, help= 'How much do you want to penalize large weights?')
+    parser.add_argument('--ad_net_mult_lr', type=float, default = .1, help= 'Multiply base net lr by this to get ad net lr.')
+    parser.add_argument('--beta_1', type=float, default=None, help= 'Set first beta in Adam.')
+    parser.add_argument('--beta_1', type=float, default=None, help= 'Set second beta in Adam.')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -567,6 +570,7 @@ if __name__ == "__main__":
     config["cycle_length"] = args.cycle_length
     config["early_stop_patience"] = args.early_stop_patience
     config["weight_decay"] = args.weight_decay
+    config["ad_net_mult_lr"] = args.ad_net_mult_lr
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
@@ -583,7 +587,7 @@ if __name__ == "__main__":
                       "trade_off":args.trade_off, "update_iter":200,
                       "intra_loss_coef": args.intra_loss_coef, "inter_loss_coef": args.inter_loss_coef, "inter_type": args.inter_type, 
                       "em_loss_coef": args.em_loss_coef}
-    
+
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
@@ -605,6 +609,9 @@ if __name__ == "__main__":
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
         config["frozen lr"] = args.lr
+
+    if args.beta_1, args.beta_2 is not None:
+        config["optimizer"]["optim_params"]["betas"] = (args.beta_1, args.beta_2)
 
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
