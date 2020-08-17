@@ -17,7 +17,6 @@ import loss
 import lr_schedule
 import torchvision.transforms as transform
 
-from sklearn.manifold import TSNE
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
