@@ -20,7 +20,7 @@ import torchvision.transforms as transform
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
-from galaxy_utils import EarlyStopping, distance_classification_test, image_classification_test, domain_cls_accuracy
+from galaxy_utils import EarlyStopping, distance_classification_test, image_classification_test, domain_cls_accuracy, visualizePerformance
 from import_and_normalize import array_to_tensor, update
 from visualize import plot_grad_flow, plot_learning_rate_scan
 
@@ -270,11 +270,17 @@ def train(config):
 
             total_loss.backward()
 
-            # if center_grad is not None:
-            #     # clear mmc_loss
-            #     center_criterion.centers.grad.zero_()
-            #     # Manually assign centers gradients other than using autograd
-            #     center_criterion.centers.backward(center_grad)
+            ######################################
+            # Plot embeddings periodically.
+            if args.blobs is not None and i/len(dset_loaders["source"]) % 50 == 0:
+                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, domain_classifier=ad_net, num_of_samples=100, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+            ##########################################
+
+            if center_grad is not None:
+                # clear mmc_loss
+                center_criterion.centers.grad.zero_()
+                # Manually assign centers gradients other than using autograd
+                center_criterion.centers.backward(center_grad)
 
             optimizer.step()
 
@@ -385,6 +391,12 @@ def train(config):
             scan_loss.append(total_loss.cpu().float().item())
 
             total_loss.backward()
+
+            ######################################
+            # Plot embeddings periodically.
+            if args.blobs is not None and i/len(dset_loaders["source"]) % 50 == 0:
+                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=50, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+            ##########################################
 
             if center_grad is not None:
                 # clear mmc_loss
@@ -553,6 +565,7 @@ if __name__ == "__main__":
     parser.add_argument('--ad_net_mult_lr', type=float, default = .1, help= 'Multiply base net lr by this to get ad net lr.')
     parser.add_argument('--beta_1', type=float, default=None, help= 'Set first beta in Adam.')
     parser.add_argument('--beta_1', type=float, default=None, help= 'Set second beta in Adam.')
+    parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -571,6 +584,7 @@ if __name__ == "__main__":
     config["early_stop_patience"] = args.early_stop_patience
     config["weight_decay"] = args.weight_decay
     config["ad_net_mult_lr"] = args.ad_net_mult_lr
+    config["blobs"] = args.blobs
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
