@@ -17,10 +17,11 @@ import loss
 import lr_schedule
 import torchvision.transforms as transform
 
+from sklearn.manifold import TSNE
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
-from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy
+from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy, visualizePerformance
 from import_and_normalize import array_to_tensor, update
 from visualize import plot_grad_flow, plot_learning_rate_scan
 
@@ -255,6 +256,12 @@ def train(config):
         
         total_loss.backward()
 
+        ######################################
+        # Plot embeddings periodically.
+        if args.blobs is not None and i/len(dset_loaders["source"]) % 50 == 0:
+            visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=100, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+        ##########################################
+
         if center_grad is not None:
             # clear mmc_loss
             center_criterion.centers.grad.zero_()
@@ -292,6 +299,7 @@ def train(config):
             writer.add_scalar("training total fisher loss", fisher_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
             writer.add_scalar("training intra-group fisher", fisher_intra_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
             writer.add_scalar("training inter-group fisher", fisher_inter_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
+
 
             #attempted validation step
             for j in range(0, len(dset_loaders["source_valid"])):
@@ -403,6 +411,7 @@ if __name__ == "__main__":
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
     parser.add_argument('--weight_decay', type=float, default = 5e-4, help= 'How much do you want to penalize large weights?')
+    parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
 
     
     args = parser.parse_args()
@@ -419,6 +428,7 @@ if __name__ == "__main__":
     config["cycle_length"] = args.cycle_length
     config["early_stop_patience"] = args.early_stop_patience
     config["weight_decay"] = args.weight_decay
+    config["blobs"] = args.blobs
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
