@@ -20,7 +20,7 @@ import torchvision.transforms as transform
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
-from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy
+from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy, visualizePerformance
 from import_and_normalize import array_to_tensor
 from visualize import plot_grad_flow, plot_learning_rate_scan
 
@@ -37,7 +37,7 @@ def train(config):
     dsets = {}
     dset_loaders = {}
 
-    #sampling WOR, i guess we leave the 10 in the middle to validate?
+        #sampling WOR, i guess we leave the 10 in the middle to validate?
     pristine_indices = torch.randperm(len(pristine_x))
     #train
     pristine_x_train = pristine_x[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
@@ -49,15 +49,38 @@ def train(config):
     pristine_x_test = pristine_x[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
     pristine_y_test = pristine_y[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
 
-    dsets["source"] = TensorDataset(pristine_x_train, pristine_y_train)
-    dsets["source_valid"] = TensorDataset(pristine_x_valid, pristine_y_valid)
-    dsets["source_test"] = TensorDataset(pristine_x_test, pristine_y_test)
+    noisy_indices = torch.randperm(len(noisy_x))
+    #train
+    noisy_x_train = noisy_x[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
+    noisy_y_train = noisy_y[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
+    #validate --- gets passed into test functions in train file
+    noisy_x_valid = noisy_x[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
+    noisy_y_valid = noisy_y[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
+    #test for evaluation file
+    noisy_x_test = noisy_x[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
+    noisy_y_test = noisy_y[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
 
-    #put your dataloaders here
+    dsets["source"] = TensorDataset(pristine_x_train, pristine_y_train)
+    dsets["target"] = TensorDataset(noisy_x_train, noisy_y_train)
+
+    dsets["source_valid"] = TensorDataset(pristine_x_valid, pristine_y_valid)
+    dsets["target_valid"] = TensorDataset(noisy_x_valid, noisy_y_valid)
+
+    dsets["source_test"] = TensorDataset(pristine_x_test, pristine_y_test)
+    dsets["target_test"] = TensorDataset(noisy_x_test, noisy_y_test)
+
+     #put your dataloaders here
     #i stole batch size numbers from below
     dset_loaders["source"] = DataLoader(dsets["source"], batch_size = 128, shuffle = True, num_workers = 1)
+    dset_loaders["target"] = DataLoader(dsets["target"], batch_size = 128, shuffle = True, num_workers = 1)
+
+    #guessing batch size based on what was done for testing in the original file
     dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 64, shuffle = True, num_workers = 1)
+    dset_loaders["target_valid"] = DataLoader(dsets["target_valid"], batch_size = 64, shuffle = True, num_workers = 1)
+
     dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 64, shuffle = True, num_workers = 1)
+    dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 64, shuffle = True, num_workers = 1)
+
 
     config['out_file'].write("dataset sizes: source={}\n".format(
         len(dsets["source"])))
@@ -201,6 +224,12 @@ def train(config):
            
         total_loss.backward()
 
+        ######################################
+        # Plot embeddings periodically.
+        if args.blobs is not None and i/len(dset_loaders["source"]) % 50 == 0:
+            visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=100, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+        ##########################################
+
         optimizer.step()
 
         if i % config["log_iter"] == 0:
@@ -284,11 +313,16 @@ if __name__ == "__main__":
                          help="Source domain x-values filename")
     parser.add_argument('--source_y_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy',
                          help="Source domain y-values filename")
+    parser.add_argument('--target_x_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_3FILT.npy',
+                         help="Target domain x-values filename")
+    parser.add_argument('--target_y_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy',
+                         help="Target domain y-values filename")
     parser.add_argument('--one_cycle', type=str, default = None, help='Do you want to turn on one-cycle learning rate?')
     parser.add_argument('--lr_scan', type=str, default = 'no', help='Set to yes for learning rate scan')
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
     parser.add_argument('--weight_decay', type=float, default = 5e-4, help= 'How much do you want to penalize large weights?')
+    parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -304,6 +338,7 @@ if __name__ == "__main__":
     config["cycle_length"] = args.cycle_length
     config["early_stop_patience"] = args.early_stop_patience
     config["weight_decay"] = args.weight_decay
+    config["blobs"] = args.blobs
 
 
     if not osp.exists(config["output_path"]):
@@ -357,6 +392,9 @@ if __name__ == "__main__":
     if config["dataset"] == 'galaxy': 
         pristine_x = array_to_tensor(osp.join(config['path'], args.source_x_file))
         pristine_y = array_to_tensor(osp.join(config['path'], args.source_y_file))
+
+        noisy_x = array_to_tensor(osp.join(config['path'], args.target_x_file))
+        noisy_y = array_to_tensor(osp.join(config['path'], args.target_y_file))
 
         def normalization(t):
             mean1 = t[:,0].mean().item()
