@@ -17,11 +17,12 @@ import loss
 import lr_schedule
 import torchvision.transforms as transform
 
+from sklearn.manifold import TSNE
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy, visualizePerformance
-from import_and_normalize import array_to_tensor
+from import_and_normalize import array_to_tensor, update
 from visualize import plot_grad_flow, plot_learning_rate_scan
 
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
@@ -396,22 +397,7 @@ if __name__ == "__main__":
         noisy_x = array_to_tensor(osp.join(config['path'], args.target_x_file))
         noisy_y = array_to_tensor(osp.join(config['path'], args.target_y_file))
 
-        def normalization(t):
-            mean1 = t[:,0].mean().item()
-            mean2 = t[:,1].mean().item()
-            mean3 = t[:,2].mean().item()
-
-            std1 = t[:,0].std().item()
-            std2 = t[:,1].std().item()
-            std3 = t[:,2].std().item()
-
-            return np.array([[mean1, mean2, mean3], [std1, std2, std3]])
-
-        pristine = normalization(pristine_x)
-        pr_trf = transform.Normalize(mean = pristine[0], std = pristine[1], inplace=True)
-
-        for i in range(0, len(pristine_x)-1):
-            pr_trf(pristine_x[i])
+        update(pristine_x, noisy_x)
 
         config["network"]["params"]["class_num"] = 2
 
