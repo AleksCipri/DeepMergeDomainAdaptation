@@ -276,11 +276,11 @@ def train(config):
                 visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, domain_classifier=ad_net, num_of_samples=100, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
             ##########################################
 
-            if center_grad is not None:
-                # clear mmc_loss
-                center_criterion.centers.grad.zero_()
-                # Manually assign centers gradients other than using autograd
-                center_criterion.centers.backward(center_grad)
+            # if center_grad is not None:
+            #     # clear mmc_loss
+            #     center_criterion.centers.grad.zero_()
+            #     # Manually assign centers gradients other than using autograd
+            #     center_criterion.centers.backward(center_grad)
 
             optimizer.step()
 
