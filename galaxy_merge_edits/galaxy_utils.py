@@ -289,10 +289,18 @@ def plot_embedding(X, y, d, title=None, imgName=None, save_dir=None):
     ax = plt.subplot(111)
 
     for i in range(X.shape[0]):
-        # plot colored number
-        plt.text(X[i, 0], X[i, 1], str(y[i]),
-                 color=plt.cm.bwr(d[i]/1.),
-                 fontdict={'weight': 'bold', 'size': 9})
+        #plot colored number
+        # plt.text(X[i, 0], X[i, 1], str(y[i]),
+        #          color=plt.cm.bwr(d[i]/1.),
+        #          fontdict={'weight': 'bold', 'size': 9})
+        
+        #plot circles and triangles
+        if y[i]==0.0:
+            plt.scatter(X[i, 0], X[i, 1], marker='o',
+                  color=plt.cm.bwr(d[i]/1.))
+        else:
+            plt.scatter(X[i, 0], X[i, 1], marker='^',
+                  color=plt.cm.bwr(d[i]/1.))
 
     plt.xticks([]), plt.yticks([])
 
