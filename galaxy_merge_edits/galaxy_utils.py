@@ -407,7 +407,7 @@ def visualizePerformance(base_network, src_test_dataloader,
     embedding1, logits = base_network(s_images)
     embedding2, logits = base_network(t_images)
 
-    tsne = TSNE(perplexity=10, n_components=2, init='pca', n_iter=5000)
+    tsne = TSNE(perplexity=10, metric= 'cosine', n_components=2, init='pca', n_iter=5000)
 
     if use_gpu:
         network_tsne = tsne.fit_transform(np.concatenate((embedding1.cpu().detach().numpy(),

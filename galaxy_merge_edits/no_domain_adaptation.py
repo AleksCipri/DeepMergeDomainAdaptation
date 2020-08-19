@@ -390,7 +390,8 @@ if __name__ == "__main__":
     config["dataset"] = args.dset
     config["path"] = args.dset_path
 
-    if config["dataset"] == 'galaxy': 
+    if config["dataset"] == 'galaxy':
+
         pristine_x = array_to_tensor(osp.join(config['path'], args.source_x_file))
         pristine_y = array_to_tensor(osp.join(config['path'], args.source_y_file))
 
