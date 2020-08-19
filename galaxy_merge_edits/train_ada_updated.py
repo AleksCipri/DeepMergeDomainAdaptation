@@ -563,8 +563,8 @@ if __name__ == "__main__":
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
     parser.add_argument('--weight_decay', type=float, default = 5e-4, help= 'How much do you want to penalize large weights?')
     parser.add_argument('--ad_net_mult_lr', type=float, default = .1, help= 'Multiply base net lr by this to get ad net lr.')
-    parser.add_argument('--beta_1', type=float, default=None, help= 'Set first beta in Adam.')
-    parser.add_argument('--beta_1', type=float, default=None, help= 'Set second beta in Adam.')
+    # parser.add_argument('--beta_1', type=float, default=None, help= 'Set first beta in Adam.')
+    # parser.add_argument('--beta_1', type=float, default=None, help= 'Set second beta in Adam.')
     parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
 
     args = parser.parse_args()
@@ -624,8 +624,8 @@ if __name__ == "__main__":
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
         config["frozen lr"] = args.lr
 
-    if args.beta_1, args.beta_2 is not None:
-        config["optimizer"]["optim_params"]["betas"] = (args.beta_1, args.beta_2)
+    # if args.beta_1 is not None and args.beta_2 is not None:
+    #     config["optimizer"]["optim_params"]["betas"] = (args.beta_1, args.beta_2)
 
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
