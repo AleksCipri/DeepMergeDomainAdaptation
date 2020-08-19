@@ -17,6 +17,7 @@ import loss
 import lr_schedule
 import torchvision.transforms as transform
 
+from sklearn.manifold import TSNE
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
@@ -389,31 +390,7 @@ if __name__ == "__main__":
     config["dataset"] = args.dset
     config["path"] = args.dset_path
 
-    if config["dataset"] == 'galaxy': 
-        # pristine_x = array_to_tensor(osp.join(config['path'], args.source_x_file))
-        # pristine_y = array_to_tensor(osp.join(config['path'], args.source_y_file))
-
-        # noisy_x = array_to_tensor(osp.join(config['path'], args.target_x_file))
-        # noisy_y = array_to_tensor(osp.join(config['path'], args.target_y_file))
-
-        # def normalization(t):
-        #     mean1 = t[:,0].mean().item()
-        #     mean2 = t[:,1].mean().item()
-        #     mean3 = t[:,2].mean().item()
-
-        #     std1 = t[:,0].std().item()
-        #     std2 = t[:,1].std().item()
-        #     std3 = t[:,2].std().item()
-
-        #     return np.array([[mean1, mean2, mean3], [std1, std2, std3]])
-
-        # pristine = normalization(pristine_x)
-        # pr_trf = transform.Normalize(mean = pristine[0], std = pristine[1], inplace=True)
-
-        # for i in range(0, len(pristine_x)-1):
-        #     pr_trf(pristine_x[i])
-
-        # config["network"]["params"]["class_num"] = 2
+    if config["dataset"] == 'galaxy':
 
         pristine_x = array_to_tensor(osp.join(config['path'], args.source_x_file))
         pristine_y = array_to_tensor(osp.join(config['path'], args.source_y_file))
