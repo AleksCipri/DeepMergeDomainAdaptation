@@ -50,7 +50,7 @@ def run(point):
         config["optimizer"]["lr_param"]["init_lr"] = config["lr"]
         config["frozen lr"] = config["lr"]
 
-    if config["beta_1"], config["beta_2"] is not None:
+    if all([config["beta_1"], config["beta_2"]]):
         config["optimizer"]["optim_params"]["betas"] = (config["beta_1"], config["args.beta_2"])
 
     config["optimizer"]["lr_type"] = "one-cycle"
