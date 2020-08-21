@@ -1,8 +1,13 @@
 from hyper_train_ada import train
 import os
+import loss
+import torch.optim as optim
+import network
+from import_and_normalize import array_to_tensor, update
+import os.path as osp
 
 def run(point):
-	os.environ["CUDA_VISIBLE_DEVICES"] = 0
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     config = {}
     config["high"] = 1.0
@@ -33,7 +38,7 @@ def run(point):
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
     elif "ResNet" in config["net"]:
         config["network"] = {"name":network.ResNetFc, \
-            "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
+            "params":{"resnet_name":config["net"], "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
     
     #set optimizer
     if config["optim_choice"] == 'Adam':
@@ -51,13 +56,13 @@ def run(point):
         config["frozen lr"] = config["lr"]
 
     if all([config["beta_1"], config["beta_2"]]):
-        config["optimizer"]["optim_params"]["betas"] = (config["beta_1"], config["args.beta_2"])
+        config["optimizer"]["optim_params"]["betas"] = (config["beta_1"], config["beta_2"])
 
     config["optimizer"]["lr_type"] = "one-cycle"
     
     #or however the path will look
     config["dataset"] = 'galaxy'
-    config["path"] = 'DeepMerge/small_20percent/'
+    config["path"] = './small_20percent/' #'DeepMerge/small_20percent/'
 
     #TODO: change paths to get to dataset
     if config["dataset"] == 'galaxy':
@@ -71,11 +76,13 @@ def run(point):
 
         config["network"]["params"]["class_num"] = 2
 
-    train(config)
+    objective = train(config,(pristine_x,pristine_y,noisy_x,noisy_y))
+
+    return objective
 
 if __name__ == "__main__":
     point = {"lr":1e-4, "trade_off":.01, "intra_loss_coef":.01, "inter_loss_coef":.01, "em_loss_coef":.01, "cycle_length":2, \
-	"weight_decay": 1e-4, "ad_net_mult_lr": .01, "beta_1": .7, "beta_2": .8}
+    "weight_decay": 1e-4, "ad_net_mult_lr": .01, "beta_1": .7, "beta_2": .8}
     
     objective = run(point)
     print("objective: ", objective)

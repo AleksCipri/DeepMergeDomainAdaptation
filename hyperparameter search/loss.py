@@ -194,7 +194,7 @@ class FisherTR(nn.Module):
         feat_dim (int): feature dimension.
     """
 
-    def __init__(self, num_classes=10, feat_dim=2, use_gpu=True):
+    def __init__(self, num_classes=10, feat_dim=2, use_gpu=False):
         super(FisherTR, self).__init__()
         self.num_classes = num_classes
         self.feat_dim = feat_dim

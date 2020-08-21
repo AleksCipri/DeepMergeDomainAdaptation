@@ -14,7 +14,7 @@ from import_and_normalize import array_to_tensor, update
 
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
-def train(config):
+def train(config,data_import):
     class_num = config["network"]["params"]["class_num"]
     loss_params = config["loss"]
 
@@ -24,6 +24,7 @@ def train(config):
                                        feat_dim=config["network"]["params"]["bottleneck_dim"])
 
     ## prepare data
+    pristine_x,pristine_y,noisy_x,noisy_y = data_import
     dsets = {}
     dset_loaders = {}
 
@@ -65,16 +66,16 @@ def train(config):
         ad_net = ad_net.cuda()
 
         ## collect parameters
-    if "DeepMerge" in args.net:
+    if "DeepMerge" in config["net"]:
         parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
         parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
         parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-    elif "ResNet18" in args.net:
+    elif "ResNet18" in config["net"]:
         parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
         parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
         parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
 
-	    if net_config["params"]["new_cls"]:
+        if net_config["params"]["new_cls"]:
 	        if net_config["params"]["use_bottleneck"]:
 	            parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
 	                            {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \

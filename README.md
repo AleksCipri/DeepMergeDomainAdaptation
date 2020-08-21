@@ -16,7 +16,7 @@ We also implement ResNetXXX...
 Images used can be found at https://doi.org/10.17909/t9-vqk6-pc80. Pristine and noisy images used in the paper can be found in SB00_augmented_3FILT.npy and SB25_augmented_3FILT.npy, respectively (label files: SB00_augmented_y_3FILT.npy and SB25_augmented_y_3FILT.npy). Raw (large) and resized images are also available for those who would like to try their own image formating and augmentation. Images we use have 3 filters, which mimic those available onboard the Hubble Space Telescope.
 
 ### Training
-To run training use .....
+Explanation how to run different versions of training as well as evaluation are given in example noebook: Running_DeepMergeDomainAdaptation_files.ipynb 
 
 
 ### Requirements
