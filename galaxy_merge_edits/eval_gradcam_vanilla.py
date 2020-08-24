@@ -199,7 +199,7 @@ if __name__ == "__main__":
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
-        config["target_layer"] = "relu"
+        config["target_layer"] = "conv3"
     elif "ResNet" in args.net:
         network_class = network.ResNetFc
         config["network"] = {"name":network_class, \

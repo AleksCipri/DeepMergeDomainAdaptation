@@ -29,7 +29,6 @@ def cam(config):
     classes[0] = 'non-merger'
     classes[1] = 'merger'
 
-    output_dir = config["output_dir"]
     dsets = {}
     # dset_loaders = {}
 
@@ -44,12 +43,6 @@ def cam(config):
 
     dsets["source"] = pristine_x_test
     dsets["target"] = noisy_x_test
-
-    #dsets["source_test"] = TensorDataset(pristine_x_test, pristine_y_test)
-    #dsets["target_test"] = TensorDataset(noisy_x_test, noisy_y_test)
-
-    #dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 64, shuffle = True, num_workers = 1)
-    #dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 64, shuffle = True, num_workers = 1)
 
     class_num = config["network"]["params"]["class_num"]
 
@@ -92,6 +85,14 @@ def cam(config):
         print("incorrect class choice")
         sys.exit()
 
+    save_where = osp.join(config["ckpt_path"], 'guided '+str(config["which"])+'-'+str(config["class"]))
+    output_dir = save_where
+
+    if not osp.exists(save_where):
+        os.makedirs(save_where)
+    else:
+        os.chdir(save_where)
+
     gcam = GradCAM(model=base_network)
     gbp = GuidedBackPropagation(model=base_network)
 
@@ -107,7 +108,9 @@ def cam(config):
         else:
             ids_ = torch.LongTensor([[target_class]] * len(source_images))
 
-        gcam.backward(ids=ids_)
+        gcam.backward(ids = ids_)
+        gbp.backward(ids = ids_)
+
         gradients = gbp.generate()
         regions = gcam.generate(target_layer=target_layer)
 
@@ -138,11 +141,11 @@ def cam(config):
 
         for j in range(0, len(source_images)-1):
 
-            print(
-                "\t#{}: {} ({:.5f})".format(
-                    j, classes[target_class], float(probs[:, target_class][j])
-                )
-            )
+            # print(
+            #     "\t#{}: {} ({:.5f})".format(
+            #         j, classes[target_class], float(probs[:, target_class][j])
+            #     )
+            # )
 
             # save_gradcam(
             #     filename=osp.join(
@@ -177,6 +180,8 @@ def cam(config):
             ids_ = torch.LongTensor([[target_class]] * len(target_images))
 
         gcam.backward(ids=ids_)
+        gbp.backward(ids = ids_)
+
         gradients = gbp.generate()
         regions = gcam.generate(target_layer=target_layer)
 
@@ -222,7 +227,6 @@ if __name__ == "__main__":
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
     parser.add_argument('--ckpt_path', type=str, required=True, help="path to load ckpt")
     parser.add_argument('--dset_path', type=str, default=None, help="The dataset directory path")
-    parser.add_argument('--output_dir', type=str, required=True, help= "Place to save the grad cam.")
     parser.add_argument('--source_x_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_3FILT.npy',
                          help="Source domain x-values filename")
     parser.add_argument('--source_y_file', type=str, default='SB_version_00_numpy_3_filters_pristine_SB00_augmented_y_3FILT.npy',
@@ -243,12 +247,11 @@ if __name__ == "__main__":
     config["ckpt_path"] = args.ckpt_path
     config["which"] = args.which
     config["class"] = args.classy
-    config["output_dir"] = args.output_dir
 
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
-        config["target_layer"] = "relu"
+        config["target_layer"] = "conv3"
     elif "ResNet" in args.net:
         network_class = network.ResNetFc
         config["network"] = {"name":network_class, \
