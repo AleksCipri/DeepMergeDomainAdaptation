@@ -164,7 +164,7 @@ def cam(config):
                     output_dir,
                     "{}-{}-guided-{}.png".format(j, net_config, classes[target_class]),
                 ),
-                gradient=gradients[j],
+                gradient= torch.mul(regions, gradients)[j], #gradients[j], #torch.mul(regions, gradients)[j],
             )
 
     elif config["which"] == 'target':
@@ -210,7 +210,7 @@ def cam(config):
                     output_dir,
                     "{}-{}-guided-{}.png".format(j, net_config, classes[target_class]),
                 ),
-                gradient=gradients[j],
+                gradient= torch.mul(regions, gradients)[j], #gradients[j],
             )
 
 
