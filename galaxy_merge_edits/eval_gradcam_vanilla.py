@@ -54,14 +54,6 @@ def cam(config):
     base_network = net_config["name"](**net_config["params"])
     base_network.load_state_dict(ckpt['base_network'])
 
-    centroids = None
-    if 'center_criterion' in ckpt.keys():
-        centroids = ckpt['center_criterion']['centers'].cpu()
-    
-    target_centroids = None
-    if 'target_center_criterion' in ckpt.keys():
-        target_centroids = ckpt['target_center_criterion']['centers'].cpu()
-
     use_gpu = torch.cuda.is_available()
 
     if use_gpu:
@@ -69,13 +61,17 @@ def cam(config):
 
         #might not get to tstack this?
         source_images = torch.stack(list(dsets["source"])).cuda()
-        target_images = torch.stack(list(dsets["source"])).cuda()
+        target_images = torch.stack(list(dsets["target"])).cuda()
 
     base_network.train(False)
 
     model_name = config["network"]
-    target_layer = config["target_layer"] #no idea... maybe i can print this out? layer4 for resnet, relu for deepemerge
     
+    if net_config == "Resnet18":
+        target_layer = base_network.layer4[1].conv2
+    else:
+        target_layer = config["target_layer"] #no idea... maybe i can print this out? layer4 for resnet, relu for deepemerge
+
     if config["class"] == 'non-merger':
         target_class = 0 #non-merger
     elif config["class"] == 'merger':
@@ -171,7 +167,7 @@ def cam(config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Evaluate DA models.')
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
-    parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
+    parser.add_argument('--net', type=str, default='ResNet18', help="Options: ResNet18,34,50,101,152; AlexNet")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
     parser.add_argument('--ckpt_path', type=str, required=True, help="path to load ckpt")
     parser.add_argument('--dset_path', type=str, default=None, help="The dataset directory path")

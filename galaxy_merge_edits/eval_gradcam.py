@@ -55,14 +55,6 @@ def cam(config):
     base_network = net_config["name"](**net_config["params"])
     base_network.load_state_dict(ckpt['base_network'])
 
-    centroids = None
-    if 'center_criterion' in ckpt.keys():
-        centroids = ckpt['center_criterion']['centers'].cpu()
-    
-    target_centroids = None
-    if 'target_center_criterion' in ckpt.keys():
-        target_centroids = ckpt['target_center_criterion']['centers'].cpu()
-
     use_gpu = torch.cuda.is_available()
 
     if use_gpu:
@@ -70,7 +62,7 @@ def cam(config):
 
         #might not get to tstack this?
         source_images = torch.stack(list(dsets["source"])).cuda()
-        target_images = torch.stack(list(dsets["source"])).cuda()
+        target_images = torch.stack(list(dsets["target"])).cuda()
 
     base_network.train(False)
 
