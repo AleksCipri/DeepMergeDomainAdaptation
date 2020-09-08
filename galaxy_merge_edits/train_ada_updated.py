@@ -117,34 +117,6 @@ def train(config):
         ad_net = ad_net.cuda()
 
         ## collect parameters
-    # if "DeepMerge" in args.net:
-    #     parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-    #     parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
-    #     parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-    # elif "ResNet18" in args.net:
-    #     parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-    #     parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
-    #     parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-
-    # if net_config["params"]["new_cls"]:
-    #     if net_config["params"]["use_bottleneck"]:
-    #         parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-    #                         {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \
-    #                         {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-    #         parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-    #         parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-    #     else:
-    #         parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-    #                         {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-    #         parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-    #         parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-    # else:
-    #     parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-    #     parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-    #     parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-    #Should I put lr_mult here as 1 for DeepMerge too? Probably!
-
-        ## collect parameters
     if "DeepMerge" in args.net:
         parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
         parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
@@ -153,6 +125,7 @@ def train(config):
         parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
         parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
         parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
+
         if net_config["params"]["new_cls"]:
             if net_config["params"]["use_bottleneck"]:
                 parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
@@ -169,6 +142,7 @@ def train(config):
         parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
         parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
         parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
+    #Should I put lr_mult here as 1 for DeepMerge too? Probably!
  
     ## set optimizer
     optimizer_config = config["optimizer"]
@@ -298,8 +272,8 @@ def train(config):
 
             ######################################
             # Plot embeddings periodically.
-            if args.blobs is not None and i/len(dset_loaders["source"]) % 50 == 0:
-                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, domain_classifier=ad_net, num_of_samples=100, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+            if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
+                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, domain_classifier=ad_net, num_of_samples=1000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
             ##########################################
 
             # if center_grad is not None:
@@ -420,8 +394,8 @@ def train(config):
 
             ######################################
             # Plot embeddings periodically.
-            if args.blobs is not None and i/len(dset_loaders["source"]) % 50 == 0:
-                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=50, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+            if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
+                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=1000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
             ##########################################
 
             if center_grad is not None:
@@ -589,8 +563,8 @@ if __name__ == "__main__":
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
     parser.add_argument('--weight_decay', type=float, default = 5e-4, help= 'How much do you want to penalize large weights?')
     parser.add_argument('--ad_net_mult_lr', type=float, default = .1, help= 'Multiply base net lr by this to get ad net lr.')
-    # parser.add_argument('--beta_1', type=float, default=None, help= 'Set first beta in Adam.')
-    # parser.add_argument('--beta_1', type=float, default=None, help= 'Set second beta in Adam.')
+    #parser.add_argument('--beta_1', type=float, default=None, help= 'Set first beta in Adam.')
+    #parser.add_argument('--beta_2', type=float, default=None, help= 'Set second beta in Adam.')
     parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
 
     args = parser.parse_args()
@@ -637,7 +611,7 @@ if __name__ == "__main__":
     
     #set optimizer
     if config["optim_choice"] == 'Adam':
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.8), "weight_decay": config["weight_decay"], \
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.9), "weight_decay": config["weight_decay"], \
                                 "amsgrad":False, "eps":1e-8}, \
                         "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
     else:

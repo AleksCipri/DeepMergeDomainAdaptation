@@ -108,44 +108,18 @@ def train(config):
         base_network = base_network.cuda()
 
     ## collect parameters
-    # if "DeepMerge" in args.net:
-    #         parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-    # elif net_config["params"]["new_cls"]:
-    #     if net_config["params"]["use_bottleneck"]:
-    #         parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-    #                         {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \
-    #                         {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-    #     else:
-    #         parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-    #                         {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-    # else:
-    #     parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
-
-    ## collect parameters
     if "DeepMerge" in args.net:
-        parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
-        parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-    elif "ResNet18" in args.net:
-        parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
-        parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-        if net_config["params"]["new_cls"]:
-            if net_config["params"]["use_bottleneck"]:
-                parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-                                {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \
-                                {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-                parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-                parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-            else:
-                parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-                                {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-                parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-                parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
+            parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
+    elif net_config["params"]["new_cls"]:
+        if net_config["params"]["use_bottleneck"]:
+            parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
+                            {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \
+                            {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
+        else:
+            parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
+                            {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
     else:
-        parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-        parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
+        parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
 
     ## add additional network for some methods
     class_weight = torch.from_numpy(np.array([1.0] * class_num))
@@ -277,8 +251,8 @@ def train(config):
 
             ######################################
             # Plot embeddings periodically.
-            if args.blobs is not None and i/len(dset_loaders["source"]) % 10 == 0:
-                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128,  num_of_samples=100, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+            if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
+                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128,  num_of_samples=1000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
 
             # if center_grad is not None:
             #     # clear mmc_loss
@@ -378,8 +352,8 @@ def train(config):
 
             ######################################
             # Plot embeddings periodically.
-            if args.blobs is not None and i/len(dset_loaders["source"]) % 10 == 0:
-                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=100, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+            if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
+                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=1000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
             ##########################################
 
             if center_grad is not None:

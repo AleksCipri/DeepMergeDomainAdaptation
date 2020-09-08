@@ -299,7 +299,7 @@ def plot_embedding(X, y, d, title=None, imgName=None, save_dir=None):
             plt.scatter(X[i, 0], X[i, 1], marker='o',
                   color=plt.cm.bwr(d[i]/1.))
         else:
-            plt.scatter(X[i, 0], X[i, 1], marker='^',
+            plt.scatter(X[i, 0], X[i, 1], marker='o', alpha=0.3,
                   color=plt.cm.bwr(d[i]/1.))
 
     plt.xticks([]), plt.yticks([])
@@ -407,7 +407,7 @@ def visualizePerformance(base_network, src_test_dataloader,
     embedding1, logits = base_network(s_images)
     embedding2, logits = base_network(t_images)
 
-    tsne = TSNE(perplexity=10, metric= 'cosine', n_components=2, init='pca', n_iter=5000)
+    tsne = TSNE(perplexity=50, metric= 'cosine', n_components=2, init='pca', n_iter=3000)
 
     if use_gpu:
         network_tsne = tsne.fit_transform(np.concatenate((embedding1.cpu().detach().numpy(),
