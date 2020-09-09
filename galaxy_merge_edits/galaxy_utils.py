@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import os.path
+import sys
 import pandas as pd
 from sklearn.metrics import confusion_matrix
 from collections import deque
@@ -69,7 +70,21 @@ def domain_cls_accuracy(d_out):
     source_acc = float(d0_pred[:batch_size].cpu().float().eq(d0_target[:batch_size]).sum()) / float(batch_size)
     target_acc = float(d0_pred[batch_size:].cpu().float().eq(d0_target[batch_size:]).sum()) / float(batch_size)
 
-    #d0_loss = 
+    # print("adnet output")
+    # print(d_out)
+    # print("batch size")
+    # print(batch_size)
+    # print("target")
+    # print(d0_target)
+    # print("prediction")
+    # print(d0_pred)
+    # print("all accuracy")
+    # print(d0_acc)
+    # print("source accuracy")
+    # print(source_acc)
+    # print("target accuracy")
+    # print(target_acc)
+    # sys.exit()
     
     return d0_acc, source_acc, target_acc
 
@@ -142,11 +157,12 @@ def distance_classification_test(loader, dictionary_val, model, centroids, gpu=T
 
         output = pd.DataFrame()
 
-        # print("all output")
-        # print(torch.max(all_output, 1)[1].cpu().detach().numpy())
-        # print()
-        # print("all label")
-        # print(all_label.cpu().detach().numpy())
+        print("all output")
+        print(all_output.cpu().detach().numpy())
+        print(torch.max(all_output, 1)[1].cpu().detach().numpy())
+        print()
+        print("all label")
+        print(all_label.cpu().detach().numpy())
 
         output['model output'] = pd.Series(torch.max(all_output, 1)[1].cpu().detach().numpy())
         output['labels'] = pd.Series(all_label.cpu().detach().numpy())
@@ -190,15 +206,20 @@ def image_classification_test(loader, dictionary_val, model, gpu=True, verbose =
                 inputs = inputs.cuda()
                 labels = labels.cuda()
             _, outputs = model(inputs)
+            softmax_outputs = nn.Softmax(dim=1)(1.0 * outputs)
+
             if start_test:
+                all_softmax_output = softmax_outputs.data.float()
                 all_output = outputs.data.float()
                 all_label = labels.data.float()
                 start_test = False
             else:
+                all_softmax_output = torch.cat((all_softmax_output, softmax_outputs.data.float()), 0)
                 all_output = torch.cat((all_output, outputs.data.float()), 0)
                 all_label = torch.cat((all_label, labels.data.float()), 0)
 
-    _, predict = torch.max(all_output, 1)
+    #_, predict = torch.max(all_output, 1)
+    _, predict = torch.max(all_softmax_output, 1)
     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).float() / float(all_label.size()[0])
     conf_matrix = confusion_matrix(all_label.cpu().numpy(), predict.cpu().numpy())
 
@@ -206,7 +227,10 @@ def image_classification_test(loader, dictionary_val, model, gpu=True, verbose =
 
         output = pd.DataFrame()
 
+        df = pd.DataFrame(all_softmax_output.cpu().detach().numpy(), columns=['non-merger', 'merger'])
+
         # print("all output")
+        # print(all_output.cpu().detach().numpy())
         # print(torch.max(all_output, 1)[1].cpu().detach().numpy())
         # print()
         # print("all label")
@@ -216,6 +240,7 @@ def image_classification_test(loader, dictionary_val, model, gpu=True, verbose =
         output['labels'] = pd.Series(all_label.cpu().detach().numpy())
 
         output.to_csv(str(save_where)+"/model_results.csv")
+        df.to_csv(str(save_where)+"/model_predictions.csv")
 
     return accuracy, conf_matrix
 

@@ -214,19 +214,24 @@ def train(config):
                             'train accuracy' : train_acc,                            
                             }
 
+            if config["loss"]["loss_name"] != "laplacian" and config["loss"]["ly_type"] == "euclidean":
+                snapshot_obj['center_criterion'] = center_criterion.state_dict()
+
             if (i+1) % config["snapshot_interval"] == 0:
                 torch.save(snapshot_obj, 
                        osp.join(config["output_path"], "epoch_{}_model.pth.tar".format(i/len(dset_loaders["source"]))))
 
-            if config["loss"]["loss_name"] != "laplacian" and config["loss"]["ly_type"] == "euclidean":
-                snapshot_obj['center_criterion'] = center_criterion.state_dict()
-
             if temp_acc > best_acc:
                 best_acc = temp_acc
-
-                # save best model
                 torch.save(snapshot_obj, 
-                           osp.join(config["output_path"], "best_model.pth.tar"))
+                               osp.join(config["output_path"], "best_model.pth.tar"))
+
+            # if i/config["test_interval"] >= 1:                                      
+            #     if (np.abs(source_acc_ad -.5) < .5) and (np.abs(target_acc_ad -.5) < .5) and (temp_acc > best_acc):
+            #         print("inside to save")
+            #         # save best model
+            #         torch.save(snapshot_obj, 
+            #                    osp.join(config["output_path"], "best_model.pth.tar"))
 
             log_str = "epoch: {}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i/len(dset_loaders["source"]), config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
             config["out_file"].write(log_str)
@@ -588,7 +593,7 @@ if __name__ == "__main__":
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
     parser.add_argument('--weight_decay', type=float, default = 5e-4, help= 'How much do you want to penalize large weights?')
-    parser.add_argument('--ad_net_mult_lr', type=float, default = .1, help= 'Multiply base net lr by this to get ad net lr.')
+    #parser.add_argument('--ad_net_mult_lr', type=float, default = None, help= 'Multiply base net lr by this to get ad net lr.')
     # parser.add_argument('--beta_1', type=float, default=None, help= 'Set first beta in Adam.')
     # parser.add_argument('--beta_1', type=float, default=None, help= 'Set second beta in Adam.')
     parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
@@ -609,7 +614,6 @@ if __name__ == "__main__":
     config["cycle_length"] = args.cycle_length
     config["early_stop_patience"] = args.early_stop_patience
     config["weight_decay"] = args.weight_decay
-    config["ad_net_mult_lr"] = args.ad_net_mult_lr
     config["blobs"] = args.blobs
 
     if not osp.exists(config["output_path"]):
@@ -655,6 +659,11 @@ if __name__ == "__main__":
 
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
+
+    if config["fisher_or_no"] == 'Fisher':
+        config["ad_net_mult_lr"] = .1
+    else:
+        config["ad_net_mult_lr"] = 1
 
     if args.lr_scan == "yes":
         config["optimizer"]["lr_type"] = "linear"
