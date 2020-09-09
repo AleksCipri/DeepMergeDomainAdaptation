@@ -304,7 +304,7 @@ def train(config):
             ######################################
             # Plot embeddings periodically.
             if args.blobs is not None and i/len(dset_loaders["source"]) % 50 == 0:
-                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, domain_classifier=ad_net, num_of_samples=100, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, domain_classifier=ad_net, num_of_samples=1000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
             ##########################################
 
             # if center_grad is not None:
@@ -593,7 +593,7 @@ if __name__ == "__main__":
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
     parser.add_argument('--weight_decay', type=float, default = 5e-4, help= 'How much do you want to penalize large weights?')
-    #parser.add_argument('--ad_net_mult_lr', type=float, default = None, help= 'Multiply base net lr by this to get ad net lr.')
+    parser.add_argument('--ad_net_mult_lr', type=float, default = None, help= 'Multiply base net lr by this to get ad net lr.')
     # parser.add_argument('--beta_1', type=float, default=None, help= 'Set first beta in Adam.')
     # parser.add_argument('--beta_1', type=float, default=None, help= 'Set second beta in Adam.')
     parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
