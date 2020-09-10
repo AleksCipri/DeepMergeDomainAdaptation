@@ -105,31 +105,6 @@ def distance_to_centroids(x, centroids):
 def distance_classification_test(loader, dictionary_val, model, centroids, gpu=True, verbose = False, save_where = None):
     start_test = True
     with torch.no_grad():
-        # if test_10crop:
-        #     iter_test = [iter(loader['test'+str(i)]) for i in range(10)]
-        #     for i in range(len(loader['test0'])):
-        #         data = [iter_test[j].next() for j in range(10)]
-        #         inputs = [data[j][0] for j in range(10)]
-        #         labels = data[0][1]
-        #         if gpu:
-        #             for j in range(10):
-        #                 inputs[j] = inputs[j].cuda()
-        #             labels = labels.cuda()
-        #             centroids = centroids.cuda()
-        #         outputs = []
-        #         for j in range(10):
-        #             features, _ = model(inputs[j])
-        #             dist = distance_to_centroids(features, centroids)
-        #             outputs.append(nn.Softmax(dim=1)(-1.0 * dist))
-        #         outputs = sum(outputs)
-        #         if start_test:
-        #             all_output = outputs.data.float()
-        #             all_label = labels.data.float()
-        #             start_test = False
-        #         else:
-        #             all_output = torch.cat((all_output, outputs.data.float()), 0)
-        #             all_label = torch.cat((all_label, labels.data.float()), 0)
-        # else:
         iter_test = iter(loader[str(dictionary_val)])
         for i in range(len(loader[str(dictionary_val)])):
             data = iter_test.next()
@@ -174,29 +149,6 @@ def distance_classification_test(loader, dictionary_val, model, centroids, gpu=T
 def image_classification_test(loader, dictionary_val, model, gpu=True, verbose = False, save_where = None):
     start_test = True
     with torch.no_grad():
-        # if test_10crop:
-        #     iter_test = [iter(loader['test'+str(i)]) for i in range(10)]
-        #     for i in range(len(loader['test0'])):
-        #         data = [iter_test[j].next() for j in range(10)]
-        #         inputs = [data[j][0] for j in range(10)]
-        #         labels = data[0][1]
-        #         if gpu:
-        #             for j in range(10):
-        #                 inputs[j] = inputs[j].cuda()
-        #             labels = labels.cuda()
-        #         outputs = []
-        #         for j in range(10):
-        #             _, predict_out = model(inputs[j])
-        #             outputs.append(nn.Softmax(dim=1)(predict_out))
-        #         outputs = sum(outputs)
-        #         if start_test:
-        #             all_output = outputs.data.float()
-        #             all_label = labels.data.float()
-        #             start_test = False
-        #         else:
-        #             all_output = torch.cat((all_output, outputs.data.float()), 0)
-        #             all_label = torch.cat((all_label, labels.data.float()), 0)
-        # else:
         iter_test = iter(loader[str(dictionary_val)])
         for i in range(len(loader[str(dictionary_val)])):
             data = iter_test.next()
@@ -246,31 +198,6 @@ def image_classification_test(loader, dictionary_val, model, gpu=True, verbose =
 
 def image_classification_predict(loader, dictionary_val, model, gpu=True, softmax_param=1.0):
     start_test = True
-    # if test_10crop:
-    #     iter_test = [iter(loader['test'+str(i)]) for i in range(10)]
-    #     for i in range(len(loader['test0'])):
-    #         data = [iter_test[j].next() for j in range(10)]
-    #         inputs = [data[j][0] for j in range(10)]
-    #         labels = data[0][1]
-    #         if gpu:
-    #             for j in range(10):
-    #                 inputs[j] = Variable(inputs[j].cuda())
-    #             labels = Variable(labels.cuda())
-    #         else:
-    #             for j in range(10):
-    #                 inputs[j] = Variable(inputs[j])
-    #             labels = Variable(labels)
-    #         outputs = []
-    #         for j in range(10):
-    #             _, predict_out = model(inputs[j])
-    #             outputs.append(nn.Softmax(dim=1)(softmax_param * predict_out))
-    #         softmax_outputs = sum(outputs)
-    #         if start_test:
-    #             all_softmax_output = softmax_outputs.data.cpu().float()
-    #             start_test = False
-    #         else:
-    #             all_softmax_output = torch.cat((all_softmax_output, softmax_outputs.data.cpu().float()), 0)
-    # else:
     iter_val = iter(loader[str(dictionary_val)])
     for i in range(len(loader[str(dictionary_val)])):
         data = iter_val.next()
@@ -312,20 +239,23 @@ def plot_embedding(X, y, d, title=None, imgName=None, save_dir=None):
     # Plot colors numbers
     plt.figure(figsize=(10,10))
     ax = plt.subplot(111)
+    alpha_list = [.3, 1]
 
     for i in range(X.shape[0]):
+    	plt.scatter(X[i, 0], X[i, 1], marker='o', alpha= alpha_list[d[i]],
+              color=plt.cm.bwr(y[i]/1.))
+    	#plt.title("Epoch" + str(int(time.time())))
         #plot colored number
         # plt.text(X[i, 0], X[i, 1], str(y[i]),
         #          color=plt.cm.bwr(d[i]/1.),
         #          fontdict={'weight': 'bold', 'size': 9})
         
-        #plot circles and triangles
-        if y[i]==0.0:
-            plt.scatter(X[i, 0], X[i, 1], marker='o',
-                  color=plt.cm.bwr(d[i]/1.))
-        else:
-            plt.scatter(X[i, 0], X[i, 1], marker='o', alpha=0.3,
-                  color=plt.cm.bwr(d[i]/1.))
+        # if y[i]==0.0:
+        #     plt.scatter(X[i, 0], X[i, 1], marker='o',
+        #           color=plt.cm.bwr(d[i]/1.))
+        # else:
+        #     plt.scatter(X[i, 0], X[i, 1], marker='o', alpha=0.3,
+        #           color=plt.cm.bwr(d[i]/1.))
 
     plt.xticks([]), plt.yticks([])
 
@@ -432,7 +362,7 @@ def visualizePerformance(base_network, src_test_dataloader,
     embedding1, logits = base_network(s_images)
     embedding2, logits = base_network(t_images)
 
-    tsne = TSNE(perplexity=50, metric= 'cosine', n_components=2, init='pca', n_iter=3000)
+    tsne = TSNE(perplexity=20, metric= 'cosine', n_components=2, init='pca', n_iter=3000)
 
     if use_gpu:
         network_tsne = tsne.fit_transform(np.concatenate((embedding1.cpu().detach().numpy(),
