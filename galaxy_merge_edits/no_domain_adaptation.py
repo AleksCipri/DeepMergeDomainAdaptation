@@ -227,7 +227,7 @@ def train(config):
 
         ######################################
         # Plot embeddings periodically.
-        if args.blobs is not None and i/len(dset_loaders["source"]) % 50 == 0:
+        if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
             visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=1000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
         ##########################################
 
