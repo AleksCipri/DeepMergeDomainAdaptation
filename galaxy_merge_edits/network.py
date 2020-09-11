@@ -98,52 +98,87 @@ class ResNetFc(nn.Module):
     return self.__in_features
 
 
-
-
-class DeepMerge(nn.Module):   
-    def __init__(self, use_bottleneck=True, bottleneck_dim=32 * 9 * 9, new_cls=True, class_num=2):
+class DeepMerge(nn.Module):
+    def __init__(self, use_bottleneck=False, bottleneck_dim=32 * 9 * 9, new_cls=False, class_num=2):
         super(DeepMerge, self).__init__()
 
         self.class_num = class_num
+        self.use_bottleneck = use_bottleneck
+        self.new_cls = new_cls
+        self.in_features = 32 * 9 * 9
+
         self.conv1 = nn.Conv2d(3, 8, kernel_size=5, stride=1, padding=2)
         self.conv2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
         self.batchn1 = nn.BatchNorm2d(8)
         self.batchn2 = nn.BatchNorm2d(16)
         self.batchn3 = nn.BatchNorm2d(32)
+        self.fc1 = nn.Linear(32 * 9 * 9, 64)
+        self.fc2 = nn.Linear(64, 32)
+        self.fc3 = nn.Linear(32, class_num)
         self.relu =  nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-        #self.drop = nn.Dropout(0.2)
-
-        self.feature_layers = nn.Sequential(self.conv1, self.batchn1, self.relu, self.maxpool, \
-                         self.conv2, self.batchn2, self.relu, self.maxpool, \
-                         self.conv3, self.batchn3, self.relu, self.maxpool)
-
-        # self.feature_layers = nn.Sequential(self.conv1, self.batchn1, self.relu, self.maxpool, self.drop, \
-        #                  self.conv2, self.batchn2, self.relu, self.maxpool, self.drop, \
-        #                  self.conv3, self.batchn3, self.relu, self.maxpool, self.drop)
-
-        self.use_bottleneck = use_bottleneck
-        self.__in_features = bottleneck_dim
-        self.new_cls = new_cls
-
-        self.lin1 =  nn.Linear(32 * 9 * 9, 64)
-        self.lin2 =  nn.Linear(64, 32)
-        self.lin3 =  nn.Linear(32, class_num)
-
-        self.lin_layers = nn.Sequential(self.lin1, self.relu, self.lin2, self.relu, self.lin3)
-
 
     def forward(self, x):
-        x = self.feature_layers(x)
-        x = x.view(x.size(0), -1)
-        if self.use_bottleneck and self.new_cls:
-            x = self.lin_layers(x)
-        y = self.lin_layers(x)
+        x = self.maxpool(self.relu(self.batchn1(self.conv1(x))))
+        x = self.maxpool(self.relu(self.batchn2(self.conv2(x))))
+        x = self.maxpool(self.relu(self.batchn3(self.conv3(x))))
+        x = x.view(-1, 32 * 9 * 9)
+        y = F.relu(self.fc1(x))
+        y = F.relu(self.fc2(y))
+        y = self.fc3(y)
         return x, y
 
     def output_num(self):
-        return self.__in_features
+    	return self.in_features
+
+
+
+
+# class DeepMerge_old(nn.Module):   
+#     def __init__(self, use_bottleneck=True, bottleneck_dim=32 * 9 * 9, new_cls=True, class_num=2):
+#         super(DeepMerge_old, self).__init__()
+
+#         self.class_num = class_num
+#         self.conv1 = nn.Conv2d(3, 8, kernel_size=5, stride=1, padding=2)
+#         self.conv2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1)
+#         self.conv3 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
+#         self.batchn1 = nn.BatchNorm2d(8)
+#         self.batchn2 = nn.BatchNorm2d(16)
+#         self.batchn3 = nn.BatchNorm2d(32)
+#         self.relu =  nn.ReLU(inplace=True)
+#         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+#         #self.drop = nn.Dropout(0.2)
+
+#         self.feature_layers = nn.Sequential(self.conv1, self.batchn1, self.relu, self.maxpool, \
+#                          self.conv2, self.batchn2, self.relu, self.maxpool, \
+#                          self.conv3, self.batchn3, self.relu, self.maxpool)
+
+#         # self.feature_layers = nn.Sequential(self.conv1, self.batchn1, self.relu, self.maxpool, self.drop, \
+#         #                  self.conv2, self.batchn2, self.relu, self.maxpool, self.drop, \
+#         #                  self.conv3, self.batchn3, self.relu, self.maxpool, self.drop)
+
+#         self.use_bottleneck = use_bottleneck
+#         self.__in_features = bottleneck_dim
+#         self.new_cls = new_cls
+
+#         self.lin1 =  nn.Linear(32 * 9 * 9, 64)
+#         self.lin2 =  nn.Linear(64, 32)
+#         self.lin3 =  nn.Linear(32, class_num)
+
+#         self.lin_layers = nn.Sequential(self.lin1, self.relu, self.lin2, self.relu, self.lin3)
+
+
+#     def forward(self, x):
+#         x = self.feature_layers(x)
+#         x = x.view(x.size(0), -1)
+#         if self.use_bottleneck and self.new_cls:
+#             x = self.lin_layers(x)
+#         y = self.lin_layers(x)
+#         return x, y
+
+#     def output_num(self):
+#         return self.__in_features
 
 
 class AdversarialNetwork(nn.Module):
