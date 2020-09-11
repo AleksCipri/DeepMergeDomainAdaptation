@@ -13,13 +13,14 @@ def run(point):
     config["net"] = "ResNet18"
     config["lr"] = point["lr"]
     config["fisher_or_no"] = "no"
+    config["transfer_type"] = point["transfer_type"]
 
     loss_dict = {"tr": loss.FisherTR, "td ": loss.FisherTD}
     optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
-    loss_dict = {"coral":loss.CORAL, "mmd":loss.mmd_distance}
+    transfer_loss_dict = {"coral":loss.CORAL, "mmd":loss.mmd_distance}
     fisher_loss_dict = {"tr": loss.FisherTR, "td": loss.FisherTD}
 
-    config["loss"] = {"name": "tr", 
+    config["loss"] = {"name": transfer_loss_dict[config["transfer_type"]], 
                       "ly_type": "cosine", 
                       "fisher_loss_type": "tr",
                       "discriminant_loss": fisher_loss_dict["tr"],
@@ -66,7 +67,7 @@ def run(point):
     train(config)
 
 if __name__ == "__main__":
-    point = {"lr":1e-4, "trade_off":.01, "intra_loss_coef":.01, "inter_loss_coef":.01, "em_loss_coef":.01, "cycle_length":2, \
+    point = {"transfer_type": "mmd", "lr":1e-4, "trade_off":.01, "intra_loss_coef":.01, "inter_loss_coef":.01, "em_loss_coef":.01, "cycle_length":2, \
     "weight_decay": 1e-4}
     
     objective = run(point)
