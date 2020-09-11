@@ -210,6 +210,7 @@ def train(config):
             log_str = "epoch: {}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i/len(dset_loaders["source"]), config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
             config["out_file"].write(log_str)
             config["out_file"].flush()
+
             writer.add_scalar("validation accuracy", temp_acc, i/len(dset_loaders["source"]))
             writer.add_scalar("training accuracy", train_acc, i/len(dset_loaders["source"]))
         
@@ -277,7 +278,7 @@ def train(config):
 
             ######################################
             # Plot embeddings periodically.
-            if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
+            if args.blobs is not None and i/len(dset_loaders["source"]) % 50 == 0:
                 visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, domain_classifier=ad_net, num_of_samples=1000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
             ##########################################
 
@@ -615,7 +616,7 @@ if __name__ == "__main__":
     
     #set optimizer
     if config["optim_choice"] == 'Adam':
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.9), "weight_decay": config["weight_decay"], \
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.8), "weight_decay": config["weight_decay"], \
                                 "amsgrad":False, "eps":1e-8}, \
                         "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
     else:

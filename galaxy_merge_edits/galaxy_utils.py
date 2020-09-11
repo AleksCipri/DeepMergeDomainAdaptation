@@ -228,7 +228,6 @@ def plot_embedding(X, y, d, title=None, imgName=None, save_dir=None):
     """
     fig_mode = 'save'
 
-
     if fig_mode is None:
         return
 
@@ -241,21 +240,13 @@ def plot_embedding(X, y, d, title=None, imgName=None, save_dir=None):
     ax = plt.subplot(111)
     alpha_list = [.3, 1]
 
+    #set opacity for domain> [source, target]
+    alpha_list = [.3, 1]
+
     for i in range(X.shape[0]):
+      
     	plt.scatter(X[i, 0], X[i, 1], marker='o', alpha= alpha_list[d[i]],
               color=plt.cm.bwr(y[i]/1.))
-    	#plt.title("Epoch" + str(int(time.time())))
-        #plot colored number
-        # plt.text(X[i, 0], X[i, 1], str(y[i]),
-        #          color=plt.cm.bwr(d[i]/1.),
-        #          fontdict={'weight': 'bold', 'size': 9})
-        
-        # if y[i]==0.0:
-        #     plt.scatter(X[i, 0], X[i, 1], marker='o',
-        #           color=plt.cm.bwr(d[i]/1.))
-        # else:
-        #     plt.scatter(X[i, 0], X[i, 1], marker='o', alpha=0.3,
-        #           color=plt.cm.bwr(d[i]/1.))
 
     plt.xticks([]), plt.yticks([])
 
@@ -319,7 +310,7 @@ def visualizePerformance(base_network, src_test_dataloader,
         assert len(src_test_dataloader) * num_of_samples, \
             'The number of samples can not bigger than dataset.' # NOT PRECISELY COMPUTATION
 
-    # Collect source data.
+    # Collect source data.-- labeled with 0
     s_images, s_labels, s_tags = [], [], []
     for batch in src_test_dataloader:
         images, labels = batch
@@ -328,8 +319,8 @@ def visualizePerformance(base_network, src_test_dataloader,
             s_images.append(images.cuda())
         else:
             s_images.append(images)
+        
         s_labels.append(labels)
-
         s_tags.append(torch.zeros((labels.size()[0])).type(torch.LongTensor))
 
         if len(s_images * batch_size) > num_of_samples:
@@ -338,8 +329,7 @@ def visualizePerformance(base_network, src_test_dataloader,
     s_images, s_labels, s_tags = torch.cat(s_images)[:num_of_samples], \
                                  torch.cat(s_labels)[:num_of_samples], torch.cat(s_tags)[:num_of_samples]
 
-
-    # Collect test data.
+    # Collect test data.-- labeled with 1
     t_images, t_labels, t_tags = [], [], []
     for batch in tgt_test_dataloader:
         images, labels = batch
@@ -348,8 +338,8 @@ def visualizePerformance(base_network, src_test_dataloader,
             t_images.append(images.cuda())
         else:
             t_images.append(images)
-        t_labels.append(labels)
 
+        t_labels.append(labels)
         t_tags.append(torch.ones((labels.size()[0])).type(torch.LongTensor))
 
         if len(t_images * batch_size) > num_of_samples:
