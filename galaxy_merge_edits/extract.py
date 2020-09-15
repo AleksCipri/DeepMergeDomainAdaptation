@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import argparse
 import tensorflow
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -10,58 +11,105 @@ from sklearn.metrics import auc
 from scipy import interp
 from sklearn.preprocessing import label_binarize
 
-
 #%%
 #load from directory folder
-os.chdir('C:/Users/dkafkes/Desktop/fermi/high velocity AI')
-acc = EventAccumulator("missed-before")
+os.chdir('C:/Users/dkafkes/Desktop/fermi/high velocity AI/trial-viz/')
+acc = EventAccumulator("alex")
 acc.Reload()
 
 # Print tags of contained entities, use these names to retrieve entities as below
 params = acc.Tags()['scalars']
 #%%
 
-#plot with training+validation
-training_accuracy = [(s.step, 100*s.value) for s in acc.Scalars('training_accuracy')]
-validation_accuracy = [(s.step, 100*s.value) for s in acc.Scalars('validation_accuracy')]
-training_loss = [(s.step, s.value) for s in acc.Scalars('training_total_loss')]
-validation_loss = [(s.step, s.value) for s in acc.Scalars('validation_total_loss')]
+if "training_source_target_domain_accuracy" in params:
+    #execute normal accuracy
+    accuracy_and_loss(acc)
+    #execute domain accuracy plot
+elif "training_accuracy" in params:
+    accuracy_and_loss(acc)
+else:
+    print("Tensor Event File does not contain the right parameters")
 
+#%% 
+def accuracy_and_loss_plot(acc):
+    #plot with training+validation
+    training_accuracy = [(s.step, 1*s.value) for s in acc.Scalars('training_accuracy')]
+    validation_accuracy = [(s.step, 1*s.value) for s in acc.Scalars('validation_accuracy')]
+    training_loss = [(s.step, s.value) for s in acc.Scalars('training_total_loss')]
+    validation_loss = [(s.step, s.value) for s in acc.Scalars('validation_total_loss')]
+    
+    
+    param_list = [training_accuracy, validation_accuracy, training_loss, validation_loss]
+    for_plot = ['training acc %', 'validation acc %', 'training loss', 'validation loss']
+    
+    fig = plt.figure()
+    ax = plt.subplot(111)
+    # plt.gca().spines['top'].set_visible(False)
+    # plt.gca().spines['right'].set_visible(False)
+    plt.title("Performance of Classifier")
+    plt.xlabel("Epoch")
+    plt.ylabel("Value")
+    
+    for i in range(0, len(param_list)):
+        x, y = zip(*(param_list[i]))
+        plt.plot(x,y, label=for_plot[i])
+    
+    # plt.ylim(0,100)
+    # plt.yticks(np.arange(0, 100, step=10))
+    ax.legend(loc='left', #bbox_to_anchor=(.6, .5),
+              ncol=1)
+    plt.show()
+    #plt.save()
 
-param_list = [training_accuracy, validation_accuracy, training_loss, validation_loss]
-for_plot = ['training acc %', 'validation acc %', 'training loss', 'validation loss']
+#%%
 
-fig = plt.figure()
-ax = plt.subplot(111)
-# plt.gca().spines['top'].set_visible(False)
-# plt.gca().spines['right'].set_visible(False)
-plt.title("Training vs. Validation")
-plt.xlabel("Epoch")
-plt.ylabel("Value")
+def adversarial_plot(acc):
+    #plot with training+validation
+    training_source_domain = [(s.step, s.value) for s in acc.Scalars('training_source_domain_accuracy')]
+    validation_source_domain = [(s.step, s.value) for s in acc.Scalars('validation_source_domain_accuracy')]
+    training_target_domain = [(s.step, s.value) for s in acc.Scalars('training_target_domain_accuracy')]
+    validation_target_domain = [(s.step, s.value) for s in acc.Scalars('validation_target_domain_accuracy')]
+    
+    param_list = [training_source_domain, validation_source_domain, training_target_domain, validation_target_domain]
+    for_plot = ['training source domain acc', 'validation source domain acc', 'training target domain acc', 'validation target domain acc']
+    
+    fig = plt.figure()
+    ax = plt.subplot(111)
+    # plt.gca().spines['top'].set_visible(False)
+    # plt.gca().spines['right'].set_visible(False)
+    plt.title("Adversarial Training Results")
+    plt.xlabel("Epoch")
+    plt.ylabel("Value")
+    
+    for i in range(0, len(param_list)):
+        x, y = zip(*(param_list[i]))
+        plt.plot(x,y, label=for_plot[i])
+    
+    plt.ylim(0,1)
+    plt.yticks(np.arange(0, 1, step=.1))
+    ax.legend(loc='best', ncol=1)
+    plt.show()
+    #plt.save()
 
-for i in range(0, len(param_list)):
-    x, y = zip(*(param_list[i]))
-    plt.plot(x,y, label=for_plot[i])
-
-plt.ylim(0,100)
-plt.yticks(np.arange(0, 100, step=10))
-ax.legend(loc='left', bbox_to_anchor=(.6, .5),
-          ncol=1)
-plt.show()
-
+#%%
+accuracy_and_loss_plot(acc)
+adversarial_plot(acc)
+    
 #%%
 #plot side by side deepmerge and resnet ROC curves for source, target all 3 runs
 #am outputting in csv file
 
 
-os.chdir('C:/Users/dkafkes/Desktop/fermi/high velocity AI/missed-before')
+#%%
+
+os.chdir('C:/Users/dkafkes/Desktop/fermi/high velocity AI/trial-viz/alex')
 predictions = pd.read_csv('model_predictions.csv')[['non-merger', 'merger']]
 ground_truth = pd.read_csv('model_results.csv')[['model output', 'labels']]
 
 #%%
 y_true = np.asarray(ground_truth.labels)
-y_probas = np.asarray(predictions)
-plot_roc2(y_true, y_probas, plot_micro = False, plot_macro = False) #classes_to_plot=['non-mergers', 'mergers'])
+y_probs = np.asarray(predictions)
+plot_roc2(y_true, y_probs, plot_micro = False, plot_macro = False) #classes_to_plot=['non-mergers', 'mergers'])
 plt.show()
 
 #%%
@@ -143,13 +191,13 @@ def plot_roc2(y_true, y_probas, title='ROC Curves',
     indices_to_plot = np.in1d(classes, classes_to_plot2)
     for i, to_plot in enumerate(indices_to_plot):
         fpr_dict[i], tpr_dict[i], _ = roc_curve(y_true, probas[:, i],
-                                                pos_label=classes_to_plot[i])
+                                                pos_label=classes[i])
         if to_plot:
             roc_auc = auc(fpr_dict[i], tpr_dict[i])
             color = plt.cm.get_cmap(cmap)(float(i) / len(classes))
             ax.plot(fpr_dict[i], tpr_dict[i], lw=2, color=color,
-                    label='ROC curve of class {0} (area = {1:0.2f})'
-                          ''.format(classes[i], roc_auc))
+                    label='Class {0} (area = {1:0.2f})'
+                          ''.format(classes_to_plot[i], roc_auc))
 
     if plot_micro:
         binarized_y_true = label_binarize(y_true, classes=classes)

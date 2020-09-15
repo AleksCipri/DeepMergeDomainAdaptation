@@ -1,11 +1,17 @@
 from hyper_train_mmd import train
+import network
+import loss
+import lr_schedule
+import torch.optim as optim
+from import_and_normalize import array_to_tensor, update
 import os
+import os.path as osp
+
 
 def run(point):
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
-
     config = {}
-    config["epochs"] = args.epochs
+    config["net"] = "ResNet18"
+    config["epochs"] = 30
     config["optim_choice"] = 'Adam'
     config["cycle_length"] = point["cycle_length"]
     config["early_stop_patience"] = 20
@@ -28,12 +34,12 @@ def run(point):
                       "intra_loss_coef": point["intra_loss_coef"], "inter_loss_coef": point["inter_loss_coef"], "inter_type": "global", 
                       "em_loss_coef": point["em_loss_coef"]}
     
-    if "DeepMerge" in args.net:
+    if "DeepMerge" in config["net"]:
         config["network"] = {"name":network.DeepMerge, \
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
-    elif "ResNet" in args.net:
+    elif "ResNet" in config["net"]:
         config["network"] = {"name":network.ResNetFc, \
-            "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
+            "params":{"resnet_name":config["net"], "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
 
     if config["optim_choice"] == "Adam":
         config["optimizer"] = {"type":"Adam", "optim_params":{"lr":1e-6, "betas":(0.7,0.8), "weight_decay": config["weight_decay"], "amsgrad":True, "eps":1e-8}, \
@@ -43,7 +49,7 @@ def run(point):
                                "weight_decay": config["weight_decay"], "nesterov":True}, "lr_type":"inv", \
                                "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
 
-    if args.lr is not None:
+    if point["lr"] is not None:
         config["optimizer"]["optim_params"]["lr"] = config["lr"]
         config["optimizer"]["lr_param"]["init_lr"] = config["lr"]
         config["frozen lr"] = config["lr"]
@@ -51,7 +57,9 @@ def run(point):
     config["optimizer"]["lr_type"] = "one-cycle"
         
     config["dataset"] = 'galaxy'
-    config["path"] = './small_20percent/'
+    #config["path"] = './small_20percent/'
+    config["path"] = 'arrays/small dataset/'
+
 
     if config["dataset"] == 'galaxy':
         pristine_x = array_to_tensor(osp.join(config['path'], 'Pristine_small_20percent.npy'))
@@ -64,11 +72,10 @@ def run(point):
 
         config["network"]["params"]["class_num"] = 2
 
-    train(config)
+    train(config, (pristine_x,pristine_y,noisy_x,noisy_y))
 
 if __name__ == "__main__":
-    point = {"transfer_type": "mmd", "lr":1e-4, "trade_off":.01, "intra_loss_coef":.01, "inter_loss_coef":.01, "em_loss_coef":.01, "cycle_length":2, \
-    "weight_decay": 1e-4}
+    point = {"transfer_type": "mmd", "lr":1e-4, "trade_off":.01, "intra_loss_coef":.01, "inter_loss_coef":.01, "em_loss_coef":.01, "cycle_length":2, "weight_decay": 1e-4}
     
     objective = run(point)
     print("objective: ", objective)

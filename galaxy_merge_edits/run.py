@@ -71,7 +71,7 @@ def run(point):
 
         config["network"]["params"]["class_num"] = 2
 
-    train(config)
+    train(config, (pristine_x,pristine_y,noisy_x,noisy_y))
 
 if __name__ == "__main__":
     point = {"lr":1e-4, "trade_off":.01, "intra_loss_coef":.01, "inter_loss_coef":.01, "em_loss_coef":.01, "cycle_length":2, \
