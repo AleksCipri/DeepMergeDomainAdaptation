@@ -9,6 +9,7 @@ import torchvision
 import network
 import loss
 import random
+import cv2
 import json
 import matplotlib
 matplotlib.use('Agg')
@@ -16,7 +17,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 import sys
-import cv2
 
 from PIL import Image
 from torch.utils.data import Dataset, TensorDataset, DataLoader
@@ -37,12 +37,14 @@ def cam(config):
 
     #sampling WOR, i guess we leave the 10 in the middle to validate?
     #pristine_indices = torch.randperm(len(pristine_x))
-    pristine_x_test = pristine_x[int(np.floor(.2*pristine_x))] #[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
-    pristine_y_test = pristine_y[int(np.floor(.2*pristine_x))] #[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
+    pristine_x_test = pristine_x[int(np.floor(.98*len(pristine_x))):]
+    pristine_y_test = pristine_y[int(np.floor(.98*len(pristine_x))):]
+    # pristine_x_test = pristine_x[int(np.floor(.05*len(pristine_x))):]
+    # pristine_y_test = pristine_y[int(np.floor(.05*len(pristine_x))):]
 
     #noisy_indices = torch.randperm(len(noisy_x))
-    noisy_x_test = noisy_x[int(np.floor(.2*noisy_x))] #[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
-    noisy_y_test = noisy_y[int(np.floor(.2*noisy_x))] #[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
+    noisy_x_test = noisy_x[int(np.floor(.98*len(noisy_x))):]
+    noisy_y_test = noisy_y[int(np.floor(.98*len(noisy_x))):]
 
     dsets["source"] = pristine_x_test
     dsets["target"] = noisy_x_test
@@ -88,10 +90,10 @@ def cam(config):
     else:
         os.chdir(save_where)
 
-    if config["network"]["name"] == 'DeepMerge':
-        heatmap_layer = base_network.conv3
-    else:
-        heatmap_layer = base_network.layer4[1].conv2 #base_network.layer4[1].bn2 #conv2
+    #if config["network"]["name"] == 'DeepMerge':
+    heatmap_layer = base_network.conv3
+    #else:
+    #    heatmap_layer = base_network.layer4[1].conv2
 
     if config["which"] == 'source':
         print("start source test: ")
@@ -101,10 +103,14 @@ def cam(config):
             label = target_class
 
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
-
+            # #plt.imshow(image)
+            # plt.savefig(osp.join(
+            #     output_dir,
+            #     "{}-{}.png".format(j, classes[target_class])))
             cv2.imwrite(osp.join(
                 output_dir,
                 "{}-{}.png".format(j, classes[target_class])), image)
+
 
     elif config["which"] == 'target':
         print("start target test: ")
@@ -115,10 +121,14 @@ def cam(config):
             label = target_class
 
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
-
+            #plt.imshow(image)
+            # plt.savefig(osp.join(
+            #    output_dir,
+            #    "{}-{}.png".format(j, classes[target_class])))
             cv2.imwrite(osp.join(
                 output_dir,
                 "{}-{}.png".format(j, classes[target_class])), image)
+
 
     else:
         print("incorrect domain choice")
