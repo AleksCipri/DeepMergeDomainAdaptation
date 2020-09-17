@@ -180,4 +180,5 @@ def train(config, data_import):
 
             optimizer.step()
 
+    #print(-1*total_loss.cpu().float().item())
     return (-1*total_loss.cpu().float().item())
