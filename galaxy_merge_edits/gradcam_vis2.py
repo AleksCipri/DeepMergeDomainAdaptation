@@ -15,6 +15,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+from matplotlib.colors import LogNorm
 import matplotlib.cm as cmx
 import sys
 
@@ -102,11 +103,17 @@ def cam(config):
             input_tensor = source_images[j]
             label = target_class
 
+            #Saving LogNorm galaxy images
+            fig1=plt.figure(figsize=(8,8))
+            plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
+            plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
+            plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
+            plt.savefig(osp.join(
+                output_dir,
+                "image{}-{}.png".format(j, classes[target_class])))
+
+            #Saving Grad-CAMs without overplotted image
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
-            # #plt.imshow(image)
-            # plt.savefig(osp.join(
-            #     output_dir,
-            #     "{}-{}.png".format(j, classes[target_class])))
             cv2.imwrite(osp.join(
                 output_dir,
                 "{}-{}.png".format(j, classes[target_class])), image)
@@ -120,11 +127,15 @@ def cam(config):
             input_tensor = target_images[j]
             label = target_class
 
+            fig1=plt.figure(figsize=(8,8))
+            plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
+            plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
+            plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
+            plt.savefig(osp.join(
+                output_dir,
+                "image{}-{}.png".format(j, classes[target_class])))
+
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
-            #plt.imshow(image)
-            # plt.savefig(osp.join(
-            #    output_dir,
-            #    "{}-{}.png".format(j, classes[target_class])))
             cv2.imwrite(osp.join(
                 output_dir,
                 "{}-{}.png".format(j, classes[target_class])), image)
