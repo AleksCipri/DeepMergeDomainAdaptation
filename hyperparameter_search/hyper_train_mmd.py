@@ -15,13 +15,13 @@ import torchvision.transforms as transform
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
-from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy#, visualizePerformance
-from import_and_normalize import array_to_tensor, update
-#from visualize import plot_grad_flow, plot_learning_rate_scan
 
+loss_dict = {"tr": loss.FisherTR, "td ": loss.FisherTD}
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
+transfer_loss_dict = {"coral":loss.CORAL, "mmd":loss.mmd_distance}
+fisher_loss_dict = {"tr": loss.FisherTR, "td": loss.FisherTD}
 
-def train(config,data_import):
+def train(config, data_import):
     ## set up summary writer
     class_num = config["network"]["params"]["class_num"]
     class_criterion = nn.CrossEntropyLoss()
@@ -30,7 +30,7 @@ def train(config,data_import):
     loss_params = config["loss"]
 
     ## prepare data
-    pristine_x,pristine_y,noisy_x,noisy_y = data_import
+    pristine_x, pristine_y , noisy_x, noisy_y = data_import
     dsets = {}
     dset_loaders = {}
 
@@ -62,36 +62,20 @@ def train(config,data_import):
 
     if use_gpu:
         base_network = base_network.cuda()
-        ad_net = ad_net.cuda()
 
-    ad_net = network.AdversarialNetwork(base_network.output_num())
-
-        ## collect parameters
+    ## collect parameters
     if "DeepMerge" in config["net"]:
-        parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
-        parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-    elif "ResNet18" in config["net"]:
-        parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
-        parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-
-        if net_config["params"]["new_cls"]:
-            if net_config["params"]["use_bottleneck"]:
-                parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-                                {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \
-                                {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-                parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-                parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-            else:
-                parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-                                {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-                parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-                parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
+            parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
+    elif net_config["params"]["new_cls"]:
+        if net_config["params"]["use_bottleneck"]:
+            parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
+                            {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \
+                            {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
+        else:
+            parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":10, 'decay_mult':2}, \
+                            {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
     else:
-        parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-        parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
+        parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
 
     ## add additional network for some methods
     class_weight = torch.from_numpy(np.array([1.0] * class_num))
@@ -173,15 +157,7 @@ def train(config,data_import):
 
             total_loss.backward()
 
-            if center_grad is not None:
-                # clear mmc_loss
-                center_criterion.centers.grad.zero_()
-                # Manually assign centers gradients other than using autograd
-                center_criterion.centers.backward(center_grad)
-
             optimizer.step()
-
-            #if i % config["log_iter"] == 0:
 
         else: # fisher loss on labeled source domain
             fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=loss_params["inter_type"], intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
@@ -204,4 +180,5 @@ def train(config,data_import):
 
             optimizer.step()
 
-    return -1*total_loss.cpu().float().item()
+    #print(-1*total_loss.cpu().float().item())
+    return (-1*total_loss.cpu().float().item())

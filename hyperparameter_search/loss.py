@@ -101,13 +101,18 @@ def maximum_mean_discrepancy(x, y, kernel=gaussian_kernel_matrix):
     return cost
 
 
-def mmd_distance(hs, ht):
+def mmd_distance(hs, ht, use_gpu=False):
     '''maximum mean discrepancy, a combination of multiple kernels
     '''
     sigmas = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 5,
               10, 15, 20, 25, 30, 35, 100, 1e3, 1e4, 1e5, 1e6]
-    gaussian_kernel = partial(gaussian_kernel_matrix,
-                              sigmas=torch.Tensor(sigmas).float().cuda())
+    if use_gpu:
+        gaussian_kernel = partial(gaussian_kernel_matrix,
+                                sigmas=torch.Tensor(sigmas).float().cuda())
+    else:
+        gaussian_kernel = partial(gaussian_kernel_matrix,
+                                sigmas=torch.Tensor(sigmas).float())
+
     loss_value = maximum_mean_discrepancy(hs, ht, kernel=gaussian_kernel)
     return torch.clamp(loss_value, min=1e-4)
 
