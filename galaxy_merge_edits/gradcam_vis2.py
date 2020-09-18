@@ -18,6 +18,7 @@ import matplotlib.colors as colors
 from matplotlib.colors import LogNorm
 import matplotlib.cm as cmx
 import sys
+import copy
 
 from PIL import Image
 from torch.utils.data import Dataset, TensorDataset, DataLoader
@@ -104,10 +105,12 @@ def cam(config):
             label = target_class
 
             #Saving LogNorm galaxy images
+            my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
+            my_cmap.set_bad(my_cmap.colors[0])
             fig1=plt.figure(figsize=(8,8))
-            plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
-            plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
-            plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
+            plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
             plt.savefig(osp.join(
                 output_dir,
                 "image{}-{}.png".format(j, classes[target_class])))
@@ -127,10 +130,12 @@ def cam(config):
             input_tensor = target_images[j]
             label = target_class
 
+            my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
+            my_cmap.set_bad(my_cmap.colors[0])
             fig1=plt.figure(figsize=(8,8))
-            plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
-            plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
-            plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap='inferno', norm=LogNorm())
+            plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
             plt.savefig(osp.join(
                 output_dir,
                 "image{}-{}.png".format(j, classes[target_class])))
