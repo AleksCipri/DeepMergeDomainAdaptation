@@ -20,8 +20,8 @@ def run(point):
     config["ad_net_mult_lr"] = point["ad_net_mult_lr"]
     config["net"] = "DeepMerge"
     config["lr"] = point["lr"]
-    config["beta_1"] = point["beta_1"]
-    config["beta_2"] = point["beta_2"] 
+    #config["beta_1"] = point["beta_1"]
+    #config["beta_2"] = point["beta_2"] 
 
     loss_dict = {"tr": loss.FisherTR, "td ": loss.FisherTD}
     optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
@@ -42,7 +42,7 @@ def run(point):
     
     #set optimizer
     if config["optim_choice"] == 'Adam':
-        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.8), "weight_decay": config["weight_decay"], \
+        config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.9), "weight_decay": config["weight_decay"], \
                                 "amsgrad":False, "eps":1e-8}, \
                         "lr_type":"inv", "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
     else:
@@ -55,8 +55,8 @@ def run(point):
         config["optimizer"]["lr_param"]["init_lr"] = config["lr"]
         config["frozen lr"] = config["lr"]
 
-    if all([config["beta_1"], config["beta_2"]]):
-        config["optimizer"]["optim_params"]["betas"] = (config["beta_1"], config["beta_2"])
+    #if all([config["beta_1"], config["beta_2"]]):
+    #    config["optimizer"]["optim_params"]["betas"] = (config["beta_1"], config["beta_2"])
 
     config["optimizer"]["lr_type"] = "one-cycle"
     
