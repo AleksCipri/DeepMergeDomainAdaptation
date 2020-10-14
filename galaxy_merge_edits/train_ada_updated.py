@@ -26,6 +26,12 @@ from visualize import plot_grad_flow, plot_learning_rate_scan
 
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+np.random.seed(42)
+torch.backends.cudnn.enabled=False
+torch.backends.cudnn.deterministic=True
+
 def train(config):
     ## set up summary writer
     writer = SummaryWriter(config['output_path'])
