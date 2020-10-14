@@ -29,6 +29,12 @@ from sklearn.manifold import TSNE
 from sklearn.metrics import confusion_matrix
 from import_and_normalize import array_to_tensor, update
 
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+np.random.seed(42)
+torch.backends.cudnn.enabled=False
+torch.backends.cudnn.deterministic=True
+
 def test(config):
     ## prepare data
     dsets = {}
