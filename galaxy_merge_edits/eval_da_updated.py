@@ -29,6 +29,13 @@ from sklearn.manifold import TSNE
 from sklearn.metrics import confusion_matrix
 from import_and_normalize import array_to_tensor, update
 
+#fix seed
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+np.random.seed(42)
+torch.backends.cudnn.enabled=False
+torch.backends.cudnn.deterministic=True
+
 def test(config):
     ## prepare data
     dsets = {}
@@ -167,7 +174,7 @@ if __name__ == "__main__":
     config["high"] = 1.0
     config["output_for_test"] = True
     config["ckpt_path"] = args.ckpt_path
-    config["output_path"] = os.path.split(args.ckpt_path)[0]
+    config["output_path"] = args.ckpt_path
     config['ly_type'] = args.ly_type
 
     if not osp.exists(config["output_path"]):

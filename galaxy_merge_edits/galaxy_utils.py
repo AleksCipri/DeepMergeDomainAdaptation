@@ -191,8 +191,8 @@ def image_classification_test(loader, dictionary_val, model, gpu=True, verbose =
         output['model output'] = pd.Series(torch.max(all_output, 1)[1].cpu().detach().numpy())
         output['labels'] = pd.Series(all_label.cpu().detach().numpy())
 
-        output.to_csv(str(save_where)+"/model_results.csv")
-        df.to_csv(str(save_where)+"/model_predictions.csv")
+        output.to_csv(str(save_where)+"/model_results_"+str(dictionary_val)+".csv")
+        df.to_csv(str(save_where)+"/model_predictions_"+str(dictionary_val)+".csv")
 
     return accuracy, conf_matrix
 
@@ -352,7 +352,7 @@ def visualizePerformance(base_network, src_test_dataloader,
     embedding1, logits = base_network(s_images)
     embedding2, logits = base_network(t_images)
 
-    tsne = TSNE(perplexity=5, metric= 'cosine', n_components=2, init='pca', n_iter=3000)
+    tsne = TSNE(perplexity=36, metric= 'cosine', n_components=2, init='pca', n_iter=3000)
 
     if use_gpu:
         network_tsne = tsne.fit_transform(np.concatenate((embedding1.cpu().detach().numpy(),

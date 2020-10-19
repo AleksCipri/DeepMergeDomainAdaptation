@@ -14,7 +14,7 @@ from sklearn.preprocessing import label_binarize
 #%%
 #load from directory folder
 os.chdir('C:/Users/dkafkes/Desktop/fermi/high velocity AI/trial-viz/')
-acc = EventAccumulator("alex")
+acc = EventAccumulator("MMD+F again still")
 acc.Reload()
 
 # Print tags of contained entities, use these names to retrieve entities as below
@@ -54,12 +54,14 @@ def accuracy_and_loss_plot(acc):
         x, y = zip(*(param_list[i]))
         plt.plot(x,y, label=for_plot[i])
     
-    # plt.ylim(0,100)
-    # plt.yticks(np.arange(0, 100, step=10))
+    plt.ylim(0,1)
+    plt.yticks(np.arange(0, 1, step=.1))
     ax.legend(loc='left', #bbox_to_anchor=(.6, .5),
               ncol=1)
     plt.show()
     #plt.save()
+
+accuracy_and_loss_plot(acc)
 
 #%%
 
@@ -92,7 +94,7 @@ def adversarial_plot(acc):
     #plt.save()
 
 #%%
-accuracy_and_loss_plot(acc)
+#accuracy_and_loss_plot(acc)
 adversarial_plot(acc)
     
 #%%

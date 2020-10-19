@@ -2,7 +2,6 @@
 script to launch training: 
 nohup python2 train_pada.py --gpu_id 1 --net ResNet50 --dset office --s_dset_path ../data/office/webcam_31_list.txt --t_dset_path ../data/office/amazon_10_list.txt --test_interval 500 --snapshot_interval 10000 --output_dir san/w2a
 '''
-
 import argparse
 import os
 import os.path as osp
@@ -28,6 +27,13 @@ from visualize import plot_grad_flow, plot_learning_rate_scan
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
 def train(config):
+    #fix seed
+    torch.manual_seed(config["seed"])
+    torch.cuda.manual_seed(config["seed"])
+    np.random.seed(config["seed"])
+    torch.backends.cudnn.enabled=False
+    torch.backends.cudnn.deterministic=True
+
     ## set up summary writer
     writer = SummaryWriter(config['output_path'])
     class_num = config["network"]["params"]["class_num"]
@@ -228,7 +234,7 @@ def train(config):
         ######################################
         # Plot embeddings periodically.
         if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
-            visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=1000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+            visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=2000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
         ##########################################
 
         optimizer.step()
@@ -324,6 +330,7 @@ if __name__ == "__main__":
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
     parser.add_argument('--weight_decay', type=float, default = 5e-4, help= 'How much do you want to penalize large weights?')
     parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
+    parser.add_argument('--seed', type=int, default=3, help='Set random seed.')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -340,7 +347,7 @@ if __name__ == "__main__":
     config["early_stop_patience"] = args.early_stop_patience
     config["weight_decay"] = args.weight_decay
     config["blobs"] = args.blobs
-
+    config["seed"] = args.seed
 
     if not osp.exists(config["output_path"]):
         os.makedirs(osp.join(config["output_path"]))

@@ -27,6 +27,14 @@ from visualize import plot_grad_flow, plot_learning_rate_scan
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
 def train(config):
+    
+    #fix seed
+    torch.manual_seed(config["seed"]
+    torch.cuda.manual_seed(config["seed"])
+    np.random.seed(config["seed"])
+    torch.backends.cudnn.enabled=False
+    torch.backends.cudnn.deterministic=True
+
     ## set up summary writer
     writer = SummaryWriter(config['output_path'])
     class_num = config["network"]["params"]["class_num"]
@@ -91,7 +99,7 @@ def train(config):
 
     config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
     config["test_interval"] = len(dset_loaders["source"])
-    config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
+    config["snapshot_interval"] = 30*len(dset_loaders)
     config["log_iter"] = len(dset_loaders["source"])
 
     #print the configuration you are using
@@ -119,13 +127,12 @@ def train(config):
         ## collect parameters
     if "DeepMerge" in args.net:
         parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
+        parameter_list.append({"params":ad_net.parameters(), "lr_mult":config["ad_net_mult_lr"], 'decay_mult':2})
         parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-    elif "ResNet18" in args.net:
-        parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
-        parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-
+    elif "ResNet" in args.net:
+        # parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
+        # parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
+        # parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
         if net_config["params"]["new_cls"]:
             if net_config["params"]["use_bottleneck"]:
                 parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
@@ -191,7 +198,7 @@ def train(config):
             if config["loss"]["loss_name"] != "laplacian" and config["loss"]["ly_type"] == "euclidean":
                 snapshot_obj['center_criterion'] = center_criterion.state_dict()
 
-            if (i+1) % config["snapshot_interval"] == 0:
+            if (i) % config["snapshot_interval"] == 0:
                 torch.save(snapshot_obj, 
                        osp.join(config["output_path"], "epoch_{}_model.pth.tar".format(i/len(dset_loaders["source"]))))
 
@@ -279,7 +286,7 @@ def train(config):
             ######################################
             # Plot embeddings periodically.
             if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
-                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, domain_classifier=ad_net, num_of_samples=1000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, domain_classifier=ad_net, num_of_samples=2000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
             ##########################################
 
             # if center_grad is not None:
@@ -551,7 +558,7 @@ if __name__ == "__main__":
     # parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
     parser.add_argument('--optim_choice', type=str, default='SGD', help='Adam or SGD')
-    parser.add_argument('--fisher_or_no', type=str, default='Fisher', help='run the code without fisher loss')
+    parser.add_argument('--fisher_or_no', type=str, default='Fisher', help='Run the code without fisher loss')
     parser.add_argument('--epochs', type=int, default=200, help='How many epochs do you want to train?')
     parser.add_argument('--grad_vis', type=str, default='no', help='Do you want to visualize your gradients?')
     parser.add_argument('--dset_path', type=str, default=None, help="The dataset directory path")
@@ -572,6 +579,7 @@ if __name__ == "__main__":
     parser.add_argument('--beta_2', type=float, default=None, help= 'Set second beta in Adam.')
     parser.add_argument('--ad_net_mult_lr', type=float, default = .1, help= 'Multiply base net lr by this to get ad net lr.')
     parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
+    parser.add_argument('--seed', type=int, default=3, help='Set random seed.')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -590,6 +598,7 @@ if __name__ == "__main__":
     config["early_stop_patience"] = args.early_stop_patience
     config["weight_decay"] = args.weight_decay
     config["blobs"] = args.blobs
+    config["seed"] = args.seed
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
@@ -635,11 +644,10 @@ if __name__ == "__main__":
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
 
-    if config["fisher_or_no"] == 'Fisher':
-        #config["ad_net_mult_lr"] = .1
-        config["ad_net_mult_lr"] = args.ad_net_mult_lr
-    else:
+    if config["fisher_or_no"] == 'no':
         config["ad_net_mult_lr"] = 1
+    else:
+        config["ad_net_mult_lr"] = args.ad_net_mult_lr
 
     if args.lr_scan == "yes":
         config["optimizer"]["lr_type"] = "linear"
