@@ -167,6 +167,9 @@ def train(config,data_import):
             total_loss = loss_params["trade_off"] * transfer_loss \
             + classifier_loss
 
+            total_loss_two = total_loss + 100*(0.5-source_acc_ad)**2 + 100*(0.5-target_acc_ad)**2
+            #total_loss_two = total_loss + 10*abs(0.5-source_acc_ad) + 10*abs(0.5-target_acc_ad)
+
             total_loss.backward()
 
             optimizer.step()
@@ -182,6 +185,9 @@ def train(config,data_import):
                          + fisher_loss \
                          + loss_params["em_loss_coef"] * em_loss \
                          + classifier_loss
+
+            total_loss_two = total_loss + 100*(0.5-source_acc_ad)**2 + 100*(0.5-target_acc_ad)**2
+            #total_loss_two = total_loss + 10*abs(0.5-source_acc_ad) + 10*abs(0.5-target_acc_ad)
         
             total_loss.backward()
 
@@ -193,4 +199,4 @@ def train(config,data_import):
 
             optimizer.step()
 
-    return total_loss.cpu().float().item()
+    return (-1*total_loss_two.cpu().float().item())

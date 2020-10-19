@@ -26,6 +26,12 @@ from visualize import plot_grad_flow, plot_learning_rate_scan
 
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+np.random.seed(42)
+torch.backends.cudnn.enabled=False
+torch.backends.cudnn.deterministic=True
+
 def train(config):
     
     #fix seed
@@ -408,7 +414,7 @@ def train(config):
             ######################################
             # Plot embeddings periodically.
             if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
-                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=1000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
+                visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=2000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
             ##########################################
 
             if center_grad is not None:
