@@ -272,7 +272,7 @@ def plot_embedding(X, y, d, title=None, imgName=None, save_dir=None):
 
         # Check extension in case.
         if not (imgName.endswith('.jpg') or imgName.endswith('.png') or imgName.endswith('.jpeg')):
-            imgName = os.path.join(folder, imgName + '.jpg')
+            imgName = os.path.join(folder, imgName + '.pdf')
 
         print('Saving ' + imgName + ' ...')
         plt.savefig(imgName)
@@ -363,4 +363,4 @@ def visualizePerformance(base_network, src_test_dataloader,
 
 
     plot_embedding(network_tsne, np.concatenate((s_labels, t_labels)),
-                         np.concatenate((s_tags, t_tags)), 'tSNE', imgName, save_dir)
+                         np.concatenate((s_tags, t_tags)), ' ', imgName, save_dir)
