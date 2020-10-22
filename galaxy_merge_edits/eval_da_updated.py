@@ -29,14 +29,16 @@ from sklearn.manifold import TSNE
 from sklearn.metrics import confusion_matrix
 from import_and_normalize import array_to_tensor, update
 
-#fix seed
-torch.manual_seed(config["seed"])
-torch.cuda.manual_seed(config["seed"])
-np.random.seed(config["seed"])
-torch.backends.cudnn.enabled=False
-torch.backends.cudnn.deterministic=True
 
 def test(config):
+    
+    #fix seed
+    torch.manual_seed(config["seed"])
+    torch.cuda.manual_seed(config["seed"])
+    np.random.seed(config["seed"])
+    torch.backends.cudnn.enabled=False
+    torch.backends.cudnn.deterministic=True
+
     ## prepare data
     dsets = {}
     dset_loaders = {}
