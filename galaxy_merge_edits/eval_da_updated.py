@@ -30,9 +30,9 @@ from sklearn.metrics import confusion_matrix
 from import_and_normalize import array_to_tensor, update
 
 #fix seed
-torch.manual_seed(42)
-torch.cuda.manual_seed(42)
-np.random.seed(42)
+torch.manual_seed(config["seed"])
+torch.cuda.manual_seed(config["seed"])
+np.random.seed(config["seed"])
 torch.backends.cudnn.enabled=False
 torch.backends.cudnn.deterministic=True
 
@@ -165,6 +165,8 @@ if __name__ == "__main__":
                          help="Target domain x-values filename")
     parser.add_argument('--target_y_file', type=str, default='SB_version_00_numpy_3_filters_noisy_SB25_augmented_y_3FILT.npy',
                          help="Target domain y-values filename")
+    parser.add_argument('--seed', type=int, default=3, help='Set random seed.')
+
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -176,6 +178,7 @@ if __name__ == "__main__":
     config["ckpt_path"] = args.ckpt_path
     config["output_path"] = args.ckpt_path
     config['ly_type'] = args.ly_type
+    config["seed"] = args.seed
 
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
