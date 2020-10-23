@@ -29,7 +29,7 @@ optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 def train(config):
     
     #fix seed
-    torch.manual_seed(config["seed"]
+    torch.manual_seed(config["seed"])
     torch.cuda.manual_seed(config["seed"])
     np.random.seed(config["seed"])
     torch.backends.cudnn.enabled=False
