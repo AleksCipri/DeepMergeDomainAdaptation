@@ -10,13 +10,12 @@ import os.path as osp
 
 def run(point):
     config = {}
-    config["net"] = "ResNet18"
-    config["epochs"] = 30
+    config["net"] = "DeepMerge"
+    config["epochs"] = 40
     config["optim_choice"] = 'Adam'
     config["cycle_length"] = point["cycle_length"]
-    config["early_stop_patience"] = 20
+    config["early_stop_patience"] = 15
     config["weight_decay"] = point["weight_decay"]
-    config["net"] = "ResNet18"
     config["lr"] = point["lr"]
     config["fisher_or_no"] = "no"
     config["transfer_type"] = point["transfer_type"]
@@ -62,11 +61,11 @@ def run(point):
 
 
     if config["dataset"] == 'galaxy':
-        pristine_x = array_to_tensor(osp.join(config['path'], 'Pristine_small_20percent.npy'))
-        pristine_y = array_to_tensor(osp.join(config['path'], 'Pristine_small_labels_20percent.npy'))
+        pristine_x = array_to_tensor(osp.join(config['path'], 'Simulation_small_20percent.npy'))
+        pristine_y = array_to_tensor(osp.join(config['path'], 'Simulation_small_labels_20percent.npy'))
 
-        noisy_x = array_to_tensor(osp.join(config['path'], 'Noisy_small_20percent.npy'))
-        noisy_y = array_to_tensor(osp.join(config['path'], 'Noisy_small_labels_20percent.npy'))
+        noisy_x = array_to_tensor(osp.join(config['path'], 'Real_small_20percent.npy'))
+        noisy_y = array_to_tensor(osp.join(config['path'], 'Real_small_labels_20percent.npy'))
 
         update(pristine_x, noisy_x)
 
