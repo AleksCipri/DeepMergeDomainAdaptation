@@ -2,13 +2,21 @@ from hyper_train_mmd import train
 import network
 import loss
 import lr_schedule
+import torch
 import torch.optim as optim
 from import_and_normalize import array_to_tensor, update
 import os
 import os.path as osp
 
-
 def run(point):
+    
+    #fix seed
+    torch.manual_seed(1)
+    torch.cuda.manual_seed(1)
+    np.random.seed(1)
+    torch.backends.cudnn.enabled=False
+    torch.backends.cudnn.deterministic=True
+    
     config = {}
     config["net"] = "DeepMerge"
     config["epochs"] = 40
@@ -18,7 +26,7 @@ def run(point):
     config["weight_decay"] = point["weight_decay"]
     config["lr"] = point["lr"]
     config["fisher_or_no"] = "no"
-    config["transfer_type"] = point["transfer_type"]
+    config["transfer_type"] = "mmd"
 
     loss_dict = {"tr": loss.FisherTR, "td ": loss.FisherTD}
     optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
@@ -30,8 +38,8 @@ def run(point):
                       "fisher_loss_type": "tr",
                       "discriminant_loss": fisher_loss_dict["tr"],
                       "trade_off": point["trade_off"], "update_iter":200,
-                      "intra_loss_coef": point["intra_loss_coef"], "inter_loss_coef": point["inter_loss_coef"], "inter_type": "global", 
-                      "em_loss_coef": point["em_loss_coef"]}
+                      "intra_loss_coef": .01, "inter_loss_coef": .01, "inter_type": "global", 
+                      "em_loss_coef": .01}
     
     if "DeepMerge" in config["net"]:
         config["network"] = {"name":network.DeepMerge, \
@@ -76,7 +84,7 @@ def run(point):
     return result
 
 if __name__ == "__main__":
-    point = {"transfer_type": "mmd", "lr":1e-4, "trade_off":.01, "intra_loss_coef":.01, "inter_loss_coef":.01, "em_loss_coef":.01, "cycle_length":2, "weight_decay": 1e-4}
+    point = {"lr":1e-4, "trade_off":.01, "cycle_length":2, "weight_decay": 1e-4}
     
     objective = run(point)
     print("objective: ", objective)
