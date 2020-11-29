@@ -65,15 +65,15 @@ def run(point):
         
     config["dataset"] = 'galaxy'
     #config["path"] = './small_20percent/'
-    config["path"] = 'arrays/small dataset/'
+    config["path"] = 'arrays/small_dataset/'
 
 
     if config["dataset"] == 'galaxy':
-        pristine_x = array_to_tensor(osp.join(config['path'], 'Simulation_small_20percent.npy'))
-        pristine_y = array_to_tensor(osp.join(config['path'], 'Simulation_small_labels_20percent.npy'))
+        pristine_x = array_to_tensor(osp.join(config['path'], 'Illustris_Xdata_05_augmented_combined_rotzoom_SMALL_3000_3000'))
+        pristine_y = array_to_tensor(osp.join(config['path'], 'Illustris_ydata_05_augmented_combined_rotzoom_SMALL_3000_3000'))
 
-        noisy_x = array_to_tensor(osp.join(config['path'], 'Real_small_20percent.npy'))
-        noisy_y = array_to_tensor(osp.join(config['path'], 'Real_small_labels_20percent.npy'))
+        noisy_x = array_to_tensor(osp.join(config['path'], 'SDSS_x_data_mergers_and_nonmergers.npy'))
+        noisy_y = array_to_tensor(osp.join(config['path'], 'SDSS_y_data_mergers_and_nonmergers.npy'))
 
         update(pristine_x, noisy_x)
 
