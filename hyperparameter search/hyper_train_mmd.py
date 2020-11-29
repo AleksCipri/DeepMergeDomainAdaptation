@@ -21,6 +21,13 @@ optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 transfer_loss_dict = {"coral":loss.CORAL, "mmd":loss.mmd_distance}
 fisher_loss_dict = {"tr": loss.FisherTR, "td": loss.FisherTD}
 
+#fix seed
+torch.manual_seed(1)
+torch.cuda.manual_seed(1)
+np.random.seed(1)
+torch.backends.cudnn.enabled=False
+torch.backends.cudnn.deterministic=True
+
 def train(config, data_import):
     ## set up summary writer
     class_num = config["network"]["params"]["class_num"]
