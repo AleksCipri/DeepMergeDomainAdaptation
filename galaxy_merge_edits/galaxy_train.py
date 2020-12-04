@@ -323,6 +323,8 @@ def train(config):
                             logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
                             source_logits = logits.narrow(0, 0, valid_source_batch_size)
 
+                        transfer_loss = transfer_criterion(features[:valid_source_batch_size], features[valid_source_batch_size:])
+
                         # source domain classification task loss
                         classifier_loss = class_criterion(source_logits, labels_valid_source.long())
 
