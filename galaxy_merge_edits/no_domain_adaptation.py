@@ -1,7 +1,26 @@
 '''
-script to launch training: 
-nohup python2 train_pada.py --gpu_id 1 --net ResNet50 --dset office --s_dset_path ../data/office/webcam_31_list.txt --t_dset_path ../data/office/amazon_10_list.txt --test_interval 500 --snapshot_interval 10000 --output_dir san/w2a
+!python no_domain_adaptation.py --gpu_id 0 \
+                              --net DeepMerge \
+                              --dset 'galaxy' \
+                              --dset_path 'arrays/SDSS_Illustris_z0/' \
+                              --output_dir 'output_DeepMerge_SDSS/noDA' \
+                              --source_x_file Illustris_Xdata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                              --source_y_file Illustris_ydata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                              --target_x_file SDSS_x_data_postmergers_and_nonmergers.npy \
+                              --target_y_file SDSS_y_data_postmergers_and_nonmergers.npy \
+                              --ly_type cosine \
+                              --one_cycle 'yes' \
+                              --cycle_length 8 \
+                              --lr 0.001 \
+                              --weight_decay 0.01 \
+                              --epoch 200 \
+                              --early_stop_patience 20 \
+                              --blobs 'yes' \
+                              --optim_choice 'Adam' \
+                              --seed 1
 '''
+
+# Importing needed packages
 import argparse
 import os
 import os.path as osp
@@ -15,55 +34,62 @@ import network
 import loss
 import lr_schedule
 import torchvision.transforms as transform
-
 from sklearn.manifold import TSNE
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
+
+# Importing functions from our other files
 from galaxy_utils import EarlyStopping, image_classification_test, distance_classification_test, domain_cls_accuracy, visualizePerformance
 from import_and_normalize import array_to_tensor, update
 from visualize import plot_grad_flow, plot_learning_rate_scan
 
+# Optimizer options. We use Adam.
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
 def train(config):
-    #fix seed
+    # Fix random seed and unable deterministic calcualtions
     torch.manual_seed(config["seed"])
     torch.cuda.manual_seed(config["seed"])
     np.random.seed(config["seed"])
     torch.backends.cudnn.enabled=False
     torch.backends.cudnn.deterministic=True
 
-    ## set up summary writer
+    ## In case of highly imbalanced classes one can add weights inside Cross-entropy loss 
+    ## made by: [1 - (x / sum(nSamples)) for x in nSamples]
+    #weights = [0.936,0.064] 
+    #class_weights = torch.FloatTensor(weights).cuda()
+
+    # Set up summary writer
     writer = SummaryWriter(config['output_path'])
     class_num = config["network"]["params"]["class_num"]
-    class_criterion = nn.CrossEntropyLoss()
+    class_criterion = nn.CrossEntropyLoss() # optionally add "weight=class_weights" in case of higly imbalanced classes
     loss_params = config["loss"]
 
-    ## prepare data
+    # Prepare image data. Image shuffling is fixed with the random seed choice.
+    # Train:validation:test = 70:10:20
     dsets = {}
     dset_loaders = {}
 
-        #sampling WOR, i guess we leave the 10 in the middle to validate?
     pristine_indices = torch.randperm(len(pristine_x))
-    #train
+    # Train sample
     pristine_x_train = pristine_x[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
     pristine_y_train = pristine_y[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
-    #validate --- gets passed into test functions in train file
+    # Validation sample --- gets passed into test functions in train file
     pristine_x_valid = pristine_x[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
     pristine_y_valid = pristine_y[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
-    #test for evaluation file
+    # Test sample for evaluation file
     pristine_x_test = pristine_x[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
     pristine_y_test = pristine_y[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
 
     noisy_indices = torch.randperm(len(noisy_x))
-    #train
+    # Train sample
     noisy_x_train = noisy_x[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
     noisy_y_train = noisy_y[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
-    #validate --- gets passed into test functions in train file
+    # Validation sample --- gets passed into test functions in train file
     noisy_x_valid = noisy_x[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
     noisy_y_valid = noisy_y[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
-    #test for evaluation file
+    # Test sample for evaluation file
     noisy_x_test = noisy_x[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
     noisy_y_test = noisy_y[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
 
@@ -76,22 +102,19 @@ def train(config):
     dsets["source_test"] = TensorDataset(pristine_x_test, pristine_y_test)
     dsets["target_test"] = TensorDataset(noisy_x_test, noisy_y_test)
 
-     #put your dataloaders here
-    #i stole batch size numbers from below
     dset_loaders["source"] = DataLoader(dsets["source"], batch_size = 128, shuffle = True, num_workers = 1)
     dset_loaders["target"] = DataLoader(dsets["target"], batch_size = 128, shuffle = True, num_workers = 1)
 
-    #guessing batch size based on what was done for testing in the original file
     dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 64, shuffle = True, num_workers = 1)
     dset_loaders["target_valid"] = DataLoader(dsets["target_valid"], batch_size = 64, shuffle = True, num_workers = 1)
 
     dset_loaders["source_test"] = DataLoader(dsets["source_test"], batch_size = 64, shuffle = True, num_workers = 1)
     dset_loaders["target_test"] = DataLoader(dsets["target_test"], batch_size = 64, shuffle = True, num_workers = 1)
 
-
     config['out_file'].write("dataset sizes: source={}\n".format(
         len(dsets["source"])))
 
+    # Set number of epochs, and logging intervals
     config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
     config["test_interval"] = len(dset_loaders["source"])
     config["snapshot_interval"] = len(dset_loaders["source"])*config["epochs"]*.25
@@ -101,10 +124,10 @@ def train(config):
     config["out_file"].write("config: {}\n".format(config))
     config["out_file"].flush()
 
-    # set up early stop
+    # Set up early stop
     early_stop_engine = EarlyStopping(config["early_stop_patience"])
 
-    ## set base network
+    # Set base network
     net_config = config["network"]
     base_network = net_config["name"](**net_config["params"])
 
@@ -112,7 +135,7 @@ def train(config):
     if use_gpu:
         base_network = base_network.cuda()
 
-    ## collect parameters
+    # Collect parameters for the chosen network to be trained
     if "DeepMerge" in args.net:
             parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
     elif net_config["params"]["new_cls"]:
@@ -126,17 +149,19 @@ def train(config):
     else:
         parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
 
-    ## add additional network for some methods
+    # Add additional network for some methods
     class_weight = torch.from_numpy(np.array([1.0] * class_num))
     if use_gpu:
         class_weight = class_weight.cuda()
  
     parameter_list.append({"params":class_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
 
-    ## set optimizer
+    # Set optimizer
     optimizer_config = config["optimizer"]
     optimizer = optim_dict[optimizer_config["type"]](parameter_list, \
                     **(optimizer_config["optim_params"]))
+
+    # Set learning rate scheduler
     param_lr = []
     for param_group in optimizer.param_groups:
         param_lr.append(param_group["lr"])
@@ -146,7 +171,11 @@ def train(config):
     scan_lr = []
     scan_loss = []
 
-    ## train   
+
+
+    ###################
+    ###### TRAIN ######
+    ###################  
     len_train_source = len(dset_loaders["source"])
     len_valid_source = len(dset_loaders["source_valid"])
 
@@ -180,7 +209,7 @@ def train(config):
                     
             if temp_acc > best_acc:
                 best_acc = temp_acc
-                # save best model
+                # Save best model
                 torch.save(snapshot_obj, 
                            osp.join(config["output_path"], "best_model.pth.tar"))
             log_str = "epoch: {}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i/len(dset_loaders["source"]), config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
@@ -189,7 +218,7 @@ def train(config):
             writer.add_scalar("validation accuracy", temp_acc, i/len(dset_loaders["source"]))
             writer.add_scalar("training accuracy", train_acc, i/len(dset_loaders["source"]))
 
-        ## train one iter
+        ## Train one iteration
         base_network.train(True)
 
         if i % config["log_iter"] == 0:
@@ -222,44 +251,51 @@ def train(config):
         features, logits = base_network(inputs)
         source_logits = logits.narrow(0, 0, source_batch_size)
 
-        # source domain classification task loss
+        # Source domain classification task loss
         classifier_loss = class_criterion(source_logits, labels_source.long())
-
+        # Final loss
         total_loss = classifier_loss
 
         scan_loss.append(total_loss.cpu().float().item())
            
         total_loss.backward()
 
-        ######################################
-        # Plot embeddings periodically.
+        #################
+        # Plot embeddings periodically. tSNE plots
         if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
             visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=2000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
-        ##########################################
+        #################
 
         optimizer.step()
 
         if i % config["log_iter"] == 0:
 
+            # In case we want to do a learning rate scane to find best lr_cycle lengh:
             if config['lr_scan'] != 'no':
                 if not osp.exists(osp.join(config["output_path"], "learning_rate_scan")):
                     os.makedirs(osp.join(config["output_path"], "learning_rate_scan"))
 
                 plot_learning_rate_scan(scan_lr, scan_loss, i/len(dset_loaders["source"]), osp.join(config["output_path"], "learning_rate_scan"))
 
+            # In case we want to visualize gradients:
             if config['grad_vis'] != 'no':
                 if not osp.exists(osp.join(config["output_path"], "gradients")):
                     os.makedirs(osp.join(config["output_path"], "gradients"))
 
                 plot_grad_flow(osp.join(config["output_path"], "gradients"), i/len(dset_loaders["source"]), base_network.named_parameters())
 
+            # Logging:
             config['out_file'].write('epoch {}: train total loss={:0.4f}, train classifier loss={:0.4f}\n'.format(i/len(dset_loaders["source"]), \
                 total_loss.data.cpu(), classifier_loss.data.cpu().float().item(),))
             config['out_file'].flush()
+
+            # Logging for tensorboard
             writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
             writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
-
-            #attempted validation step
+                
+            #################
+            # Validation step
+            #################
             for j in range(0, len(dset_loaders["source_valid"])):
                 base_network.train(False)
                 with torch.no_grad():
@@ -280,20 +316,22 @@ def train(config):
                     features, logits = base_network(inputs)
                     source_logits = logits.narrow(0, 0, source_batch_size)
                 
-                    # source domain classification task loss
+                    # Source domain classification task loss
                     classifier_loss = class_criterion(source_logits, labels_source.long())
-                    
-                    # final loss
+                    # Final loss
                     total_loss = classifier_loss
-                    #total_loss.backward() no backprop on the eval mode
 
+                # Logging:
                 if j % len(dset_loaders["source_valid"]) == 0:
                     config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid classifier loss={:0.4f}\n'.format(i/len(dset_loaders["source"]), \
                         total_loss.data.cpu(), classifier_loss.data.cpu().float().item(),))
                     config['out_file'].flush()
+
+                    # Logging for tensorboard:
                     writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                     writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
             
+                    # Early stop in case we see overfitting
                     if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
                         config["out_file"].write("overfitting after {}, stop training at epoch {}\n".format(
                             config["early_stop_patience"], i/len(dset_loaders["source"])))
@@ -302,15 +340,14 @@ def train(config):
 
     return best_acc
 
-
+# Adding all possible arguments and their default values
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Feature-based Transfer Learning')
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
     parser.add_argument('--lr', type=float, default=0.001, help="learning rate")
     parser.add_argument('--ly_type', type=str, default="cosine", choices=["cosine", "euclidean"], help="type of classification loss.")
-    parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
+    parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18, DeepMerge")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
-    # parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
     parser.add_argument('--optim_choice', type=str, default='SGD', help='Adam or SGD')
     parser.add_argument('--epochs', type=int, default=200, help='How many epochs do you want to train?')
@@ -329,13 +366,13 @@ if __name__ == "__main__":
     parser.add_argument('--cycle_length', type=int, default = 2, help = 'If using one-cycle learning, how many epochs should one learning rate cycle be?')
     parser.add_argument('--early_stop_patience', type=int, default = 10, help = 'Number of epochs for early stopping.')
     parser.add_argument('--weight_decay', type=float, default = 5e-4, help= 'How much do you want to penalize large weights?')
-    parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
+    parser.add_argument('--blobs', type=str, default=None, help='Plot tSNE plots.')
     parser.add_argument('--seed', type=int, default=3, help='Set random seed.')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
-    # train config
+    # Train config
     config = {}
     config["epochs"] = args.epochs
     config["output_for_test"] = True
@@ -349,17 +386,18 @@ if __name__ == "__main__":
     config["blobs"] = args.blobs
     config["seed"] = args.seed
 
+    # Set log file
     if not osp.exists(config["output_path"]):
         os.makedirs(osp.join(config["output_path"]))
         config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
     else:
         config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
 
-    # set loss
+    # Set loss
     config["loss"] = { "ly_type": args.ly_type, 
                       "update_iter":200, }    
     
-    #set network parameters
+    # Set parameters that depend on the choice of the network
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
@@ -367,7 +405,7 @@ if __name__ == "__main__":
         config["network"] = {"name":network.ResNetFc, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
     
-    #set optimizer
+    # Set optimizer parameters
     if config["optim_choice"] == 'Adam':
         config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.8), "weight_decay":config["weight_decay"], \
                                  "amsgrad":False, "eps":1e-8} , \
@@ -377,23 +415,24 @@ if __name__ == "__main__":
                                "weight_decay": config["weight_decay"], "nesterov":True}, "lr_type":"inv" , \
                                "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75}}
 
-    #override default if it is specified
+    # Learning rate paramters
     if args.lr is not None:
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
         config["frozen lr"] = args.lr
 
+    # One-cycle parameters
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
 
+    # Set paramaters needed for lr_scan
     if args.lr_scan == "yes":
         config["optimizer"]["lr_type"] = "linear"
         config["optimizer"]["optim_params"]["lr"] = 1e-6
         config["optimizer"]["lr_param"]["init_lr"] = 1e-6
         config["frozen lr"] = 1e-6
         config["epochs"] = 5
-    
-    #load dataset    
+      
     config["dataset"] = args.dset
     config["path"] = args.dset_path
 

@@ -381,6 +381,7 @@ def train(config):
                         config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid transfer loss={:0.4f}, valid classifier loss={:0.4f}\n'.format(
                             i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),))
                         config['out_file'].flush()
+                        # vLogging for tensorboard:
                         writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation transfer loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
@@ -630,11 +631,13 @@ if __name__ == "__main__":
                                "weight_decay": config["weight_decay"], "nesterov":True}, "lr_type":"inv", \
                                "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
 
+    # Learning rate paramters
     if args.lr is not None:
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
         config["frozen lr"] = args.lr
-
+        
+    # One-cycle parameters
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
  
