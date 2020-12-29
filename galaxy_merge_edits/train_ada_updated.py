@@ -1,8 +1,45 @@
 '''
-script to launch training: 
-nohup python2 train_pada.py --gpu_id 1 --net ResNet50 --dset office --s_dset_path ../data/office/webcam_31_list.txt --t_dset_path ../data/office/amazon_10_list.txt --test_interval 500 --snapshot_interval 10000 --output_dir san/w2a
+Example script to launch training: 
+!python train_ada_updated.py --gpu_id 0 \
+                              --net DeepMerge \
+                              --dset 'galaxy' \
+                              --dset_path 'arrays/SDSS_Illustris_z0/' \
+                              --output_dir 'output_DeepMerge_SDSS/ADA+F' \
+                              --source_x_file Illustris_Xdata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                              --source_y_file Illustris_ydata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                              --target_x_file SDSS_x_data_mergers_and_nonmergers.npy \
+                              --target_y_file SDSS_y_data_mergers_and_nonmergers.npy \
+                              --ly_type cosine \
+                              --one_cycle 'yes' \
+                              --cycle_length 8 \
+                              --lr 0.001 \
+                              --epoch 200 \
+                              --early_stop_patience 20 \
+                              --weight_decay 0.0001 \
+                              --trade_off 1.0 \
+                              --optim_choice 'Adam' \
+                              --blobs 'yes' \
+                              --ad_net_mult_lr 0.01 \
+                              --em_loss_coef 0.0001 \
+                              --inter_loss_coef 1.0 \
+                              --intra_loss_coef 0.0001 \
+                              --seed 1
+
+Example script to launch evaluation of the trained model:
+!python eval_da_updated.py --gpu_id 0 \
+                --net DeepMerge \
+                --dset 'galaxy' \
+                --dset_path 'arrays/' \
+                --ly_type cosine \
+                --ckpt_path 'output_DeepMerge_SDSS/ADA+F' \
+                --source_x_file Illustris_Xdata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                --source_y_file Illustris_ydata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                --target_x_file SDSS_x_data_mergers_and_nonmergers.npy \
+                --target_y_file SDSS_y_data_mergers_and_nonmergers.npy \
+                --seed 1 
 '''
 
+# Importing needed packages
 import argparse
 import os
 import os.path as osp
@@ -16,59 +53,67 @@ import network
 import loss
 import lr_schedule
 import torchvision.transforms as transform
-
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
+
+# Importing functions from our other files
 from galaxy_utils import EarlyStopping, distance_classification_test, image_classification_test, domain_cls_accuracy, visualizePerformance
 from import_and_normalize import array_to_tensor, update
 from visualize import plot_grad_flow, plot_learning_rate_scan
 
+# Optimizer options. We use Adam.
 optim_dict = {"SGD": optim.SGD, "Adam": optim.Adam}
 
 def train(config):
     
-    #fix seed
+    # Fix random seed and unable deterministic calcualtions
     torch.manual_seed(config["seed"])
     torch.cuda.manual_seed(config["seed"])
     np.random.seed(config["seed"])
     torch.backends.cudnn.enabled=False
     torch.backends.cudnn.deterministic=True
 
-    ## set up summary writer
+    ## In case of highly imbalanced classes one can add weights inside Cross-entropy loss 
+    ## made by: [1 - (x / sum(nSamples)) for x in nSamples]
+    #weights = [0.936,0.064] 
+    #class_weights = torch.FloatTensor(weights).cuda()
+
+    # Set up summary writer
     writer = SummaryWriter(config['output_path'])
     class_num = config["network"]["params"]["class_num"]
     loss_params = config["loss"]
 
-    class_criterion = nn.CrossEntropyLoss()
+    class_criterion = nn.CrossEntropyLoss() # optionally add "weight=class_weights" in case of higly imbalanced classes
     transfer_criterion = loss.PADA
     center_criterion = loss_params["loss_type"](num_classes=class_num, 
                                        feat_dim=config["network"]["params"]["bottleneck_dim"])
 
-    ## prepare data
+    # Prepare image data. Image shuffling is fixed with the random seed choice.
+    # Train:validation:test = 70:10:20
     dsets = {}
     dset_loaders = {}
 
-    #sampling WOR, i guess we leave the 10 in the middle to validate?
+    
     pristine_indices = torch.randperm(len(pristine_x))
-    #train
+    # Train sample
     pristine_x_train = pristine_x[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
     pristine_y_train = pristine_y[pristine_indices[:int(np.floor(.7*len(pristine_x)))]]
-    #validate --- gets passed into test functions in train file
+    # Validation sample --- gets passed into test functions in train file
     pristine_x_valid = pristine_x[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
     pristine_y_valid = pristine_y[pristine_indices[int(np.floor(.7*len(pristine_x))) : int(np.floor(.8*len(pristine_x)))]]
-    #test for evaluation file
+    # Test sample for evaluation file
     pristine_x_test = pristine_x[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
     pristine_y_test = pristine_y[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
 
     noisy_indices = torch.randperm(len(noisy_x))
-    #train
+    # Train sample
     noisy_x_train = noisy_x[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
     noisy_y_train = noisy_y[noisy_indices[:int(np.floor(.7*len(noisy_x)))]]
-    #validate --- gets passed into test functions in train file
+    # Validation sample --- gets passed into test functions in train file
     noisy_x_valid = noisy_x[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
     noisy_y_valid = noisy_y[noisy_indices[int(np.floor(.7*len(noisy_x))) : int(np.floor(.8*len(noisy_x)))]]
-    #test for evaluation file
+    # Test sample for evaluation file
     noisy_x_test = noisy_x[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
     noisy_y_test = noisy_y[noisy_indices[int(np.floor(.8*len(noisy_x))):]]
 
@@ -82,12 +127,9 @@ def train(config):
     dsets["source_test"] = TensorDataset(pristine_x_test, pristine_y_test)
     dsets["target_test"] = TensorDataset(noisy_x_test, noisy_y_test)
 
-    #put your dataloaders here
-    #i stole batch size numbers from below
-    dset_loaders["source"] = DataLoader(dsets["source"], batch_size =128, shuffle = True, num_workers = 1)
+    dset_loaders["source"] = DataLoader(dsets["source"], batch_size = 128, shuffle = True, num_workers = 1)
     dset_loaders["target"] = DataLoader(dsets["target"], batch_size = 128, shuffle = True, num_workers = 1)
 
-    #guessing batch size based on what was done for testing in the original file
     dset_loaders["source_valid"] = DataLoader(dsets["source_valid"], batch_size = 64, shuffle = True, num_workers = 1)
     dset_loaders["target_valid"] = DataLoader(dsets["target_valid"], batch_size = 64, shuffle = True, num_workers = 1)
 
@@ -97,19 +139,20 @@ def train(config):
     config['out_file'].write("dataset sizes: source={}, target={}\n".format(
         len(dsets["source"]), len(dsets["target"])))
 
+    # Set number of epochs, and logging intervals
     config["num_iterations"] = len(dset_loaders["source"])*config["epochs"]+1
     config["test_interval"] = len(dset_loaders["source"])
     config["snapshot_interval"] = 30*len(dset_loaders)
     config["log_iter"] = len(dset_loaders["source"])
 
-    #print the configuration you are using
+    # Print the configuration you are using
     config["out_file"].write("config: {}\n".format(config))
     config["out_file"].flush()
 
-    # set up early stop
+    # Set up early stop
     early_stop_engine = EarlyStopping(config["early_stop_patience"])
 
-    ## set base network
+    # Set base network
     net_config = config["network"]
     base_network = net_config["name"](**net_config["params"])
 
@@ -117,44 +160,38 @@ def train(config):
     if use_gpu:
         base_network = base_network.cuda()
 
-    ## add additional network for some methods
+    # Additional network to add for DANN (domain classifier)
     ad_net = network.AdversarialNetwork(base_network.output_num())
-    gradient_reverse_layer = network.AdversarialLayer(high_value = config["high"]) #, 
-                                                      #max_iter_value=config["num_iterations"])
+    gradient_reverse_layer = network.AdversarialLayer(high_value = config["high"])                                                 
     if use_gpu:
         ad_net = ad_net.cuda()
 
-        ## collect parameters
+    # Class weights in case we need them, hewe we have balanced sample so weights are 1.0
+    class_weight = torch.from_numpy(np.array([1.0] * class_num))
+    if use_gpu:
+        class_weight = class_weight.cuda()
+
+    # Collect parameters for the chosen network to be trained
     if "DeepMerge" in args.net:
-        parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult":config["ad_net_mult_lr"], 'decay_mult':2})
-        parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-    elif "ResNet" in args.net:
-        # parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        # parameter_list.append({"params":ad_net.parameters(), "lr_mult":.1, 'decay_mult':2})
-        # parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-        if net_config["params"]["new_cls"]:
-            if net_config["params"]["use_bottleneck"]:
-                parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-                                {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \
-                                {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-                parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-                parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-            else:
-                parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
-                                {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
-                parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-                parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
+            parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
+    elif net_config["params"]["new_cls"]:
+        if net_config["params"]["use_bottleneck"]:
+            parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
+                            {"params":base_network.bottleneck.parameters(), "lr_mult":10, 'decay_mult':2}, \
+                            {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
+        else:
+            parameter_list = [{"params":base_network.feature_layers.parameters(), "lr_mult":1, 'decay_mult':2}, \
+                            {"params":base_network.fc.parameters(), "lr_mult":10, 'decay_mult':2}]
     else:
-        parameter_list = [{"params":base_network.parameters(), "lr_mult":1, 'decay_mult':2}]
-        parameter_list.append({"params":ad_net.parameters(), "lr_mult": config["ad_net_mult_lr"], 'decay_mult':2})
-        parameter_list.append({"params":center_criterion.parameters(), "lr_mult": 10, 'decay_mult':1})
-    #Should I put lr_mult here as 1 for DeepMerge too? Probably!
+        parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
+   
  
-    ## set optimizer
+    # Set optimizer
     optimizer_config = config["optimizer"]
     optimizer = optim_dict[optimizer_config["type"]](parameter_list, \
                     **(optimizer_config["optim_params"]))
+
+    # Set learning rate scheduler
     param_lr = []
     for param_group in optimizer.param_groups:
         param_lr.append(param_group["lr"])
@@ -164,7 +201,11 @@ def train(config):
     scan_lr = []
     scan_loss = []
 
-    ## train   
+
+
+    ###################
+    ###### TRAIN ######
+    ###################  
     len_train_source = len(dset_loaders["source"])
     len_train_target = len(dset_loaders["target"])
     len_valid_source = len(dset_loaders["source_valid"])
@@ -204,16 +245,11 @@ def train(config):
 
             if temp_acc > best_acc:
                 best_acc = temp_acc
+                # Save best model
                 torch.save(snapshot_obj, 
                                osp.join(config["output_path"], "best_model.pth.tar"))
 
-            # if i/config["test_interval"] >= 1:                                      
-            #     if (np.abs(source_acc_ad -.5) < .5) and (np.abs(target_acc_ad -.5) < .5) and (temp_acc > best_acc):
-            #         print("inside to save")
-            #         # save best model
-            #         torch.save(snapshot_obj, 
-            #                    osp.join(config["output_path"], "best_model.pth.tar"))
-
+            # Write to log file
             log_str = "epoch: {}, {} validation accuracy: {:.5f}, {} training accuracy: {:.5f}\n".format(i/len(dset_loaders["source"]), config['loss']['ly_type'], temp_acc, config['loss']['ly_type'], train_acc)
             config["out_file"].write(log_str)
             config["out_file"].flush()
@@ -221,7 +257,7 @@ def train(config):
             writer.add_scalar("validation accuracy", temp_acc, i/len(dset_loaders["source"]))
             writer.add_scalar("training accuracy", train_acc, i/len(dset_loaders["source"]))
         
-        ## train one iter
+        ## Train one iter
         base_network.train(True)
 
         if i % config["log_iter"] == 0:
@@ -256,6 +292,7 @@ def train(config):
         inputs = torch.cat((inputs_source, inputs_target), dim=0)
         source_batch_size = inputs_source.size(0)
 
+        # Distance type. We use cosine.
         if config['loss']['ly_type'] == 'cosine':
             features, logits = base_network(inputs)
             source_logits = logits.narrow(0, 0, source_batch_size)
@@ -264,6 +301,7 @@ def train(config):
             logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
             source_logits = logits.narrow(0, 0, source_batch_size)
 
+        # Go through domain classifier
         ad_net.train(True)
         weight_ad = torch.ones(inputs.size(0))
         transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
@@ -271,10 +309,10 @@ def train(config):
         ad_out, _ = ad_net(features.detach())
         ad_acc, source_acc_ad, target_acc_ad = domain_cls_accuracy(ad_out)
 
-        # source domain classification task loss
+        # Source domain classification task loss
         classifier_loss = class_criterion(source_logits, labels_source.long())
-        # fisher loss on labeled source domain
-
+        
+        # Final loss in case we do not want to add Fisher loss and Entropy minimization
         if config["fisher_or_no"] == 'no':
             total_loss = loss_params["trade_off"] * transfer_loss \
             + classifier_loss
@@ -283,40 +321,39 @@ def train(config):
 
             total_loss.backward()
 
-            ######################################
-            # Plot embeddings periodically.
+            #################
+            # Plot embeddings periodically. tSNE plots
             if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
                 visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, domain_classifier=ad_net, num_of_samples=2000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
-            ##########################################
-
-            # if center_grad is not None:
-            #     # clear mmc_loss
-            #     center_criterion.centers.grad.zero_()
-            #     # Manually assign centers gradients other than using autograd
-            #     center_criterion.centers.backward(center_grad)
+            ##################
 
             optimizer.step()
 
             if i % config["log_iter"] == 0:
 
+                # In case we want to do a learning rate scane to find best lr_cycle lengh: 
                 if config['lr_scan'] != 'no':
                     if not osp.exists(osp.join(config["output_path"], "learning_rate_scan")):
                         os.makedirs(osp.join(config["output_path"], "learning_rate_scan"))
 
                     plot_learning_rate_scan(scan_lr, scan_loss, i/len(dset_loaders["source"]), osp.join(config["output_path"], "learning_rate_scan"))
 
+                # In case we want to visualize gradients:
                 if config['grad_vis'] != 'no':
                     if not osp.exists(osp.join(config["output_path"], "gradients")):
                         os.makedirs(osp.join(config["output_path"], "gradients"))
 
                     plot_grad_flow(osp.join(config["output_path"], "gradients"), i/len(dset_loaders["source"]), base_network.named_parameters())
 
+                # Logging:
                 config['out_file'].write('epoch {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f},'
                     'train source+target domain accuracy={:0.4f}, train source domain accuracy={:0.4f}, train target domain accuracy={:0.4f}\n'.format(
                     i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),
                     ad_acc, source_acc_ad, target_acc_ad,
                     ))
                 config['out_file'].flush()
+
+                # Logging for tensorboard
                 writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                 writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                 writer.add_scalar("training transfer loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
@@ -324,7 +361,9 @@ def train(config):
                 writer.add_scalar("training source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                 writer.add_scalar("training target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
-                #attempted validation step
+                #################
+                # Validation step
+                #################
                 for j in range(0, len(dset_loaders["source_valid"])):
                     base_network.train(False)
                     with torch.no_grad():
@@ -347,6 +386,7 @@ def train(config):
                         valid_inputs = torch.cat((inputs_valid_source, inputs_valid_target), dim=0)
                         valid_source_batch_size = inputs_valid_source.size(0)
 
+                        # Distance type. We use cosine.
                         if config['loss']['ly_type'] == 'cosine':
                             features, logits = base_network(valid_inputs)
                             source_logits = logits.narrow(0, 0, valid_source_batch_size)
@@ -355,6 +395,7 @@ def train(config):
                             logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
                             source_logits = logits.narrow(0, 0, valid_source_batch_size)
 
+                        # Go through domain classifier
                         ad_net.train(False)
                         weight_ad = torch.ones(valid_inputs.size(0))
                         transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
@@ -362,13 +403,14 @@ def train(config):
                         ad_out, _ = ad_net(features.detach())
                         ad_acc, source_acc_ad, target_acc_ad = domain_cls_accuracy(ad_out)
 
-                        # source domain classification task loss
+                        # Source domain classification task loss
                         classifier_loss = class_criterion(source_logits, labels_valid_source.long())
 
-                        #if config["fisher_or_no"] == 'no':
+                        #Final loss in case we do not want to add Fisher loss and Entropy minimization
                         total_loss = loss_params["trade_off"] * transfer_loss \
                                     + classifier_loss
 
+                    # Logging:
                     if j % len(dset_loaders["source_valid"]) == 0:
                         config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid transfer loss={:0.4f}, valid classifier loss={:0.4f},'
                             'valid source+target domain accuracy={:0.4f}, valid source domain accuracy={:0.4f}, valid target domain accuracy={:0.4f}\n'.format(
@@ -376,6 +418,7 @@ def train(config):
                             ad_acc, source_acc_ad, target_acc_ad,
                             ))
                         config['out_file'].flush()
+                        # Logging for tensorboard:
                         writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation transfer loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
@@ -383,19 +426,21 @@ def train(config):
                         writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                         writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
+                        # Early stop in case we see overfitting
                         if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
                             config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
                             config["early_stop_patience"], i/len(dset_loaders["source"])))
                             
                             sys.exit()   
 
+        # In case we want to add Fisher loss and Entropy minimizaiton
         else:       
             fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(inputs.size(0)/2)), labels_source, inter_class=config["loss"]["inter_type"], 
                                                                                    intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
-            # entropy minimization loss
+            # Entropy minimization loss
             em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
 
-            # final loss
+            # Final loss is the sum of all losses
             total_loss = loss_params["trade_off"] * transfer_loss \
                          + fisher_loss \
                          + loss_params["em_loss_coef"] * em_loss \
@@ -405,14 +450,14 @@ def train(config):
 
             total_loss.backward()
 
-            ######################################
+            #################
             # Plot embeddings periodically.
             if args.blobs is not None and i/len(dset_loaders["source"]) % 20 == 0:
                 visualizePerformance(base_network, dset_loaders["source"], dset_loaders["target"], batch_size=128, num_of_samples=2000, imgName='embedding_' + str(i/len(dset_loaders["source"])), save_dir=osp.join(config["output_path"], "blobs"))
-            ##########################################
+            #################
 
             if center_grad is not None:
-                # clear mmc_loss
+                # Clear mmc_loss
                 center_criterion.centers.grad.zero_()
                 # Manually assign centers gradients other than using autograd
                 center_criterion.centers.backward(center_grad)
@@ -421,18 +466,21 @@ def train(config):
 
             if i % config["log_iter"] == 0:
 
+                # In case we want to do a learning rate scane to find best lr_cycle lengh: 
                 if config['lr_scan'] != 'no':
                     if not osp.exists(osp.join(config["output_path"], "learning_rate_scan")):
                         os.makedirs(osp.join(config["output_path"], "learning_rate_scan"))
 
                     plot_learning_rate_scan(scan_lr, scan_loss, i/len(dset_loaders["source"]), osp.join(config["output_path"], "learning_rate_scan"))
 
+                # In case we want to visualize gradients:
                 if config['grad_vis'] != 'no':
                     if not osp.exists(osp.join(config["output_path"], "gradients")):
                         os.makedirs(osp.join(config["output_path"], "gradients"))
 
                     plot_grad_flow(osp.join(config["output_path"], "gradients"), i/len(dset_loaders["source"]), base_network.named_parameters())
 
+                # Logging
                 config['out_file'].write('epoch {}: train total loss={:0.4f}, train transfer loss={:0.4f}, train classifier loss={:0.4f}, '
                 'train entropy min loss={:0.4f}, '
                 'train fisher loss={:0.4f}, train intra-group fisher loss={:0.4f}, train inter-group fisher loss={:0.4f}, '
@@ -444,6 +492,7 @@ def train(config):
                 ))
 
                 config['out_file'].flush()
+                # Logging for tensorboard
                 writer.add_scalar("training total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                 writer.add_scalar("training classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                 writer.add_scalar("training transfer loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
@@ -455,7 +504,9 @@ def train(config):
                 writer.add_scalar("training source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                 writer.add_scalar("training target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
-                #attempted validation step
+                #################
+                # Validation step
+                #################
                 for j in range(0, len(dset_loaders["source_valid"])):
                     base_network.train(False)
                     with torch.no_grad():
@@ -478,6 +529,7 @@ def train(config):
                         valid_inputs = torch.cat((inputs_valid_source, inputs_valid_target), dim=0)
                         valid_source_batch_size = inputs_valid_source.size(0)
 
+                        # Distance type. We use cosine.
                         if config['loss']['ly_type'] == 'cosine':
                             features, logits = base_network(valid_inputs)
                             source_logits = logits.narrow(0, 0, valid_source_batch_size)
@@ -486,6 +538,7 @@ def train(config):
                             logits = -1.0 * loss.distance_to_centroids(features, center_criterion.centers.detach())
                             source_logits = logits.narrow(0, 0, valid_source_batch_size)
 
+                        # Go through domain classifier
                         ad_net.train(False)
                         weight_ad = torch.ones(valid_inputs.size(0))
                         transfer_loss = transfer_criterion(features, ad_net, gradient_reverse_layer, \
@@ -493,21 +546,22 @@ def train(config):
                         ad_out, _ = ad_net(features.detach())
                         ad_acc, source_acc_ad, target_acc_ad = domain_cls_accuracy(ad_out)
 
-                        # source domain classification task loss
+                        # Source domain classification task loss
                         classifier_loss = class_criterion(source_logits, labels_valid_source.long())
 
-                        # fisher loss on labeled source domain
+                        # Fisher loss on labeled source domain
                         fisher_loss, fisher_intra_loss, fisher_inter_loss, center_grad = center_criterion(features.narrow(0, 0, int(valid_inputs.size(0)/2)), labels_valid_source, inter_class=loss_params["inter_type"], 
                                                                                                intra_loss_weight=loss_params["intra_loss_coef"], inter_loss_weight=loss_params["inter_loss_coef"])
-                        # entropy minimization loss
+                        # Entropy minimization loss
                         em_loss = loss.EntropyLoss(nn.Softmax(dim=1)(logits))
                         
-                        # final loss
+                        # Final loss
                         total_loss = loss_params["trade_off"] * transfer_loss \
                                      + fisher_loss \
                                      + loss_params["em_loss_coef"] * em_loss \
                                      + classifier_loss
 
+                    # Logging
                     if j % len(dset_loaders["source_valid"]) == 0:
                         config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid transfer loss={:0.4f}, valid classifier loss={:0.4f}, '
                             'valid entropy min loss={:0.4f}, '
@@ -520,6 +574,7 @@ def train(config):
                             ))
 
                         config['out_file'].flush()
+                        # Logging for tensorboard
                         writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation entropy minimization loss", em_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
@@ -532,6 +587,7 @@ def train(config):
                         writer.add_scalar("validation source domain accuracy", source_acc_ad, i/len(dset_loaders["source"]))
                         writer.add_scalar("validation target domain accuracy", target_acc_ad, i/len(dset_loaders["source"]))
 
+                        # Early stop in case we see overfitting 
                         if early_stop_engine.is_stop_training(classifier_loss.cpu().float().item()):
                             config["out_file"].write("no improvement after {}, stop training at step {}\n".format(
                             config["early_stop_patience"], i/len(dset_loaders["source"])))
@@ -540,22 +596,22 @@ def train(config):
 
     return best_acc
 
+# Adding all possible arguments and their default values
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='TL with disciminative loss')
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
     parser.add_argument('--lr', type=float, help="learning rate")
     parser.add_argument('--ly_type', type=str, default="cosine", choices=["cosine", "euclidean"], help="type of classification loss.")
     parser.add_argument('--trade_off', type=float, default=1.0, help="coef of transfer_loss")
-    parser.add_argument('--intra_loss_coef', type=float, default=0.01, help="coef of intra_loss.")
-    parser.add_argument('--inter_loss_coef', type=float, default=0.01, help="coef of inter_loss.")
+    parser.add_argument('--intra_loss_coef', type=float, default=0.0, help="coef of intra_loss.")
+    parser.add_argument('--inter_loss_coef', type=float, default=0.0, help="coef of inter_loss.")
     parser.add_argument('--em_loss_coef', type=float, default=0.0, help="coef of entropy minimization loss.")
     parser.add_argument('--fisher_loss_type', type=str, default="tr", 
                         choices=["tr", "td"], 
                         help="type of Fisher loss.")
     parser.add_argument('--inter_type', type=str, default="global", choices=["none", "sample", "global"], help="type of inter_class loss.")
-    parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
+    parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18, DeepMerge")
     parser.add_argument('--dset', type=str, default='office', help="The dataset or source dataset used")
-    # parser.add_argument('--dset_path', type=str, default='/arrays', help="The source dataset path")
     parser.add_argument('--output_dir', type=str, default='san', help="output directory of our model (in ../snapshot directory)")
     parser.add_argument('--optim_choice', type=str, default='SGD', help='Adam or SGD')
     parser.add_argument('--fisher_or_no', type=str, default='Fisher', help='Run the code without fisher loss')
@@ -578,13 +634,13 @@ if __name__ == "__main__":
     parser.add_argument('--beta_1', type=float, default=None, help= 'Set first beta in Adam.')
     parser.add_argument('--beta_2', type=float, default=None, help= 'Set second beta in Adam.')
     parser.add_argument('--ad_net_mult_lr', type=float, default = .1, help= 'Multiply base net lr by this to get ad net lr.')
-    parser.add_argument('--blobs', type=str, default=None, help='Plot blob figures.')
+    parser.add_argument('--blobs', type=str, default=None, help='Plot tSNE plots.')
     parser.add_argument('--seed', type=int, default=3, help='Set random seed.')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
-    # train config
+    # Train config
     config = {}
     config["high"] = 1.0
     config["epochs"] = args.epochs
@@ -600,12 +656,14 @@ if __name__ == "__main__":
     config["blobs"] = args.blobs
     config["seed"] = args.seed
 
+    # Set log file
     if not osp.exists(config["output_path"]):
         os.makedirs(config["output_path"])
         config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w")
     if osp.exists(config["output_path"]):
         config["out_file"] = open(osp.join(config["output_path"], "log.txt"), "w") 
 
+    # Set loss
     loss_dict = {"tr": loss.FisherTR, 
                  "td ": loss.FisherTD, 
                  }
@@ -616,6 +674,7 @@ if __name__ == "__main__":
                       "intra_loss_coef": args.intra_loss_coef, "inter_loss_coef": args.inter_loss_coef, "inter_type": args.inter_type, 
                       "em_loss_coef": args.em_loss_coef}
 
+    # Set parameters that depend on the choice of the network
     if "DeepMerge" in args.net:
         config["network"] = {"name":network.DeepMerge, \
             "params":{"class_num":2, "new_cls":True, "use_bottleneck":False, "bottleneck_dim":32*9*9} }
@@ -623,7 +682,7 @@ if __name__ == "__main__":
         config["network"] = {"name":network.ResNetFc, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
     
-    #set optimizer
+    # Set optimizer parameters
     if config["optim_choice"] == 'Adam':
         config["optimizer"] = {"type":"Adam", "optim_params":{"lr":0.001, "betas":(0.7,0.8), "weight_decay": config["weight_decay"], \
                                 "amsgrad":False, "eps":1e-8}, \
@@ -633,22 +692,26 @@ if __name__ == "__main__":
                                "weight_decay": config["weight_decay"], "nesterov":True}, "lr_type":"inv", \
                                "lr_param":{"init_lr":0.005, "gamma":0.001, "power":0.75} }
 
+    # Learning rate paramters
     if args.lr is not None:
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
         config["frozen lr"] = args.lr
-
+    # Set betas through argparser
     if args.beta_1 is not None and args.beta_2 is not None:
         config["optimizer"]["optim_params"]["betas"] = (args.beta_1, args.beta_2)
 
+    # One-cycle parameters
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
 
+    # Set learning rate multiplication factor if we use / don;t use Fisher loss
     if config["fisher_or_no"] == 'no':
         config["ad_net_mult_lr"] = 1
     else:
         config["ad_net_mult_lr"] = args.ad_net_mult_lr
 
+    # Set paramaters needed for lr_scan
     if args.lr_scan == "yes":
         config["optimizer"]["lr_type"] = "linear"
         config["optimizer"]["optim_params"]["lr"] = 1e-6

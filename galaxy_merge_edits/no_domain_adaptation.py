@@ -18,6 +18,19 @@
                               --blobs 'yes' \
                               --optim_choice 'Adam' \
                               --seed 1
+
+Example script to launch evaluation of the trained model:
+!python eval_da_updated.py --gpu_id 0 \
+                --net DeepMerge \
+                --dset 'galaxy' \
+                --dset_path 'arrays/' \
+                --ly_type cosine \
+                --ckpt_path 'output_DeepMerge_SDSS/noDA' \
+                --source_x_file Illustris_Xdata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                --source_y_file Illustris_ydata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                --target_x_file SDSS_x_data_mergers_and_nonmergers.npy \
+                --target_y_file SDSS_y_data_mergers_and_nonmergers.npy \
+                --seed 1 
 '''
 
 # Importing needed packages
@@ -149,7 +162,7 @@ def train(config):
     else:
         parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
 
-    # Add additional network for some methods
+    # Class weights in case we need them, hewe we have balanced sample so weights are 1.0
     class_weight = torch.from_numpy(np.array([1.0] * class_num))
     if use_gpu:
         class_weight = class_weight.cuda()

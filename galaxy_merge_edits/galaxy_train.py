@@ -4,7 +4,7 @@ Example script to launch training:
                               --net DeepMerge \
                               --dset 'galaxy' \
                               --dset_path 'arrays/SDSS_Illustris_z0/' \
-                              --output_dir 'output_DeepMerge_SDSS/MMDF/' \
+                              --output_dir 'output_DeepMerge_SDSS/MMD+F/' \
                               --source_x_file Illustris_Xdata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
                               --source_y_file Illustris_ydata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
                               --target_x_file SDSS_x_data_mergers_and_nonmergers.npy \
@@ -25,6 +25,19 @@ Example script to launch training:
                               --inter_loss_coef 1.0 \
                               --intra_loss_coef 0.01 \
                               --seed 1
+
+Example script to launch evaluation of the trained model:
+!python eval_da_updated.py --gpu_id 0 \
+                --net DeepMerge \
+                --dset 'galaxy' \
+                --dset_path 'arrays/' \
+                --ly_type cosine \
+                --ckpt_path 'output_DeepMerge_SDSS/MMD+F' \
+                --source_x_file Illustris_Xdata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                --source_y_file Illustris_ydata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                --target_x_file SDSS_x_data_mergers_and_nonmergers.npy \
+                --target_y_file SDSS_y_data_mergers_and_nonmergers.npy \
+                --seed 1 
 '''
 
 # Importing needed packages
@@ -160,7 +173,7 @@ def train(config):
     else:
         parameter_list = [{"params":base_network.parameters(), "lr_mult":10, 'decay_mult':2}]
 
-    # Add additional network for some methods
+    # Class weights in case we need them, hewe we have balanced sample so weights are 1.0
     class_weight = torch.from_numpy(np.array([1.0] * class_num))
     if use_gpu:
         class_weight = class_weight.cuda()
@@ -358,6 +371,7 @@ def train(config):
                         valid_inputs = torch.cat((inputs_valid_source, inputs_valid_target), dim=0)
                         valid_source_batch_size = inputs_valid_source.size(0)
 
+                        # Distance type. We use cosine.
                         if config['loss']['ly_type'] == 'cosine':
                             features, logits = base_network(valid_inputs)
                             source_logits = logits.narrow(0, 0, valid_source_batch_size)
@@ -381,7 +395,7 @@ def train(config):
                         config['out_file'].write('epoch {}: valid total loss={:0.4f}, valid transfer loss={:0.4f}, valid classifier loss={:0.4f}\n'.format(
                             i/len(dset_loaders["source"]), total_loss.data.cpu().float().item(), transfer_loss.data.cpu().float().item(), classifier_loss.data.cpu().float().item(),))
                         config['out_file'].flush()
-                        # vLogging for tensorboard:
+                        # Logging for tensorboard:
                         writer.add_scalar("validation total loss", total_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation classifier loss", classifier_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
                         writer.add_scalar("validation transfer loss", transfer_loss.data.cpu().float().item(), i/len(dset_loaders["source"]))
@@ -484,6 +498,7 @@ def train(config):
                         valid_inputs = torch.cat((inputs_valid_source, inputs_valid_target), dim=0)
                         valid_source_batch_size = inputs_valid_source.size(0)
 
+                        # Distance type. We use cosine.
                         if config['loss']['ly_type'] == 'cosine':
                             features, logits = base_network(valid_inputs)
                             source_logits = logits.narrow(0, 0, valid_source_batch_size)
@@ -636,7 +651,7 @@ if __name__ == "__main__":
         config["optimizer"]["optim_params"]["lr"] = args.lr
         config["optimizer"]["lr_param"]["init_lr"] = args.lr
         config["frozen lr"] = args.lr
-        
+
     # One-cycle parameters
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
