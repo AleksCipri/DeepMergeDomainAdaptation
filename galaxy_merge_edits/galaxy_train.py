@@ -25,19 +25,6 @@ Example script to launch training:
                               --inter_loss_coef 1.0 \
                               --intra_loss_coef 0.01 \
                               --seed 1
-
-Example script to launch evaluation of the trained model:
-!python eval_da_updated.py --gpu_id 0 \
-                --net DeepMerge \
-                --dset 'galaxy' \
-                --dset_path 'arrays/' \
-                --ly_type cosine \
-                --ckpt_path 'output_DeepMerge_SDSS/MMD+F' \
-                --source_x_file Illustris_Xdata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
-                --source_y_file Illustris_ydata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
-                --target_x_file SDSS_x_data_mergers_and_nonmergers.npy \
-                --target_y_file SDSS_y_data_mergers_and_nonmergers.npy \
-                --seed 1 
 '''
 
 # Importing needed packages
