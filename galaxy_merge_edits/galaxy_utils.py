@@ -1,3 +1,4 @@
+# Importing needed packages
 import numpy as np
 import torch
 import torch.nn as nn
@@ -24,10 +25,6 @@ class EarlyStopping(object):
 
     def is_stop_training(self, score):
         stop_sign = False
-        # print("Best loss: ", self.best_score)
-        # print("New loss: ", score)
-        # print("Counter: ", self.counter)
-        # print("Patience: ", self.patience)
 
         self.meter.append(score)
 
@@ -69,22 +66,6 @@ def domain_cls_accuracy(d_out):
     d0_acc = float(d0_pred.data.cpu().float().eq(d0_target).sum()) / float(d_out.size(0))
     source_acc = float(d0_pred[:batch_size].cpu().float().eq(d0_target[:batch_size]).sum()) / float(batch_size)
     target_acc = float(d0_pred[batch_size:].cpu().float().eq(d0_target[batch_size:]).sum()) / float(batch_size)
-
-    # print("adnet output")
-    # print(d_out)
-    # print("batch size")
-    # print(batch_size)
-    # print("target")
-    # print(d0_target)
-    # print("prediction")
-    # print(d0_pred)
-    # print("all accuracy")
-    # print(d0_acc)
-    # print("source accuracy")
-    # print(source_acc)
-    # print("target accuracy")
-    # print(target_acc)
-    # sys.exit()
     
     return d0_acc, source_acc, target_acc
 
@@ -103,6 +84,17 @@ def distance_to_centroids(x, centroids):
     return torch.norm(dist, dim=-1)
 
 def distance_classification_test(loader, dictionary_val, model, centroids, gpu=True, verbose = False, save_where = None):
+    '''classification test based on euclidean distance (using distance_to_centroids function
+    Args:
+        loader: image loader
+        dictionary_val: images
+        model: Neural network model
+        centroids: class centeroids
+    Returns:
+        accuracy of the classificaiton
+        confusion matrix of the classifier
+        model results: predicted classes saved as csv
+    '''
     start_test = True
     with torch.no_grad():
         iter_test = iter(loader[str(dictionary_val)])
@@ -147,6 +139,17 @@ def distance_classification_test(loader, dictionary_val, model, centroids, gpu=T
     return accuracy, conf_matrix
 
 def image_classification_test(loader, dictionary_val, model, gpu=True, verbose = False, save_where = None):
+    '''classification test based on cosine distance
+    Args:
+        loader: loader for images
+        dictionary_val: images
+        model: Neural network model
+    Returns:
+        accuracy of theclassifiction
+        confusion matrix of the classifier
+        model results: predicted classes saved as csv
+        model predictions: output probabilities saved as csv
+    '''
     start_test = True
     with torch.no_grad():
         iter_test = iter(loader[str(dictionary_val)])
@@ -170,7 +173,6 @@ def image_classification_test(loader, dictionary_val, model, gpu=True, verbose =
                 all_output = torch.cat((all_output, outputs.data.float()), 0)
                 all_label = torch.cat((all_label, labels.data.float()), 0)
 
-    #_, predict = torch.max(all_output, 1)
     _, predict = torch.max(all_softmax_output, 1)
     accuracy = torch.sum(torch.squeeze(predict).float() == all_label).float() / float(all_label.size()[0])
     conf_matrix = confusion_matrix(all_label.cpu().numpy(), predict.cpu().numpy())
@@ -181,13 +183,6 @@ def image_classification_test(loader, dictionary_val, model, gpu=True, verbose =
 
         df = pd.DataFrame(all_softmax_output.cpu().detach().numpy(), columns=['non-merger', 'merger'])
 
-        # print("all output")
-        # print(all_output.cpu().detach().numpy())
-        # print(torch.max(all_output, 1)[1].cpu().detach().numpy())
-        # print()
-        # print("all label")
-        # print(all_label.cpu().detach().numpy())
-
         output['model output'] = pd.Series(torch.max(all_output, 1)[1].cpu().detach().numpy())
         output['labels'] = pd.Series(all_label.cpu().detach().numpy())
 
@@ -197,6 +192,14 @@ def image_classification_test(loader, dictionary_val, model, gpu=True, verbose =
     return accuracy, conf_matrix
 
 def image_classification_predict(loader, dictionary_val, model, gpu=True, softmax_param=1.0):
+    '''classification test based on cosine distance
+    Args:
+        loader: loader for images
+        dictionary_val: images
+        model: Neural network model
+    Returns:
+        softmax outputs from the classifier
+    '''
     start_test = True
     iter_val = iter(loader[str(dictionary_val)])
     for i in range(len(loader[str(dictionary_val)])):
@@ -217,25 +220,27 @@ def image_classification_predict(loader, dictionary_val, model, gpu=True, softma
 
 
 def plot_embedding(X, y, d, title=None, imgName=None, save_dir=None):
-    """
+    '''
     Plot an embedding X with the class label y colored by the domain d.
-    :param X: embedding
-    :param y: label
-    :param d: domain
-    :param title: title on the figure
-    :param imgName: the name of saving image
-    :return:
-    """
+    Args:
+        param X: embedding
+        param y: label
+        param d: domain
+        param title: title on the figure
+        param imgName: the name of saving image
+    Returns:
+        tSNE plots of the embeddings
+    '''
     fig_mode = 'save'
 
     if fig_mode is None:
         return
 
-    # normalization
+    # Normalization
     x_min, x_max = np.min(X, 0), np.max(X, 0)
     X = (X - x_min) / (x_max - x_min)
 
-    # Plot colors numbers
+    # Plot figure
     plt.figure(figsize=(10,10))
     ax = plt.subplot(111)
     alpha_list = [.3, 1]
@@ -284,21 +289,21 @@ def visualizePerformance(base_network, src_test_dataloader,
                          tgt_test_dataloader, batch_size, domain_classifier=None, num_of_samples=None, imgName=None, use_gpu=True, save_dir=None):
     """
     Evaluate the performance of dann and source only by visualization.
-    :param feature_extractor: network used to extract feature from target samples
-    #:param class_classifier: network used to predict labels
-    :param domain_classifier: network used to predict domain
-    :param source_dataloader: test dataloader of source domain
-    :param target_dataloader: test dataloader of target domain
-    :batch_size: batch size used in the main code 
-    :param num_of_samples: the number of samples (from train and test respectively) for t-sne
-    :param imgName: the name of saving image
+    Args:
+        param feature_extractor: network used to extract feature from target samples
+        param class_classifier: network used to predict labels
+        param domain_classifier: network used to predict domain
+        param source_dataloader: test dataloader of source domain
+        param target_dataloader: test dataloader of target domain
+        batch_size: batch size used in the main code 
+        param num_of_samples: the number of samples (from train and test respectively) for t-sne
+        param imgName: the name of saving image
 
-    :return:
+    Returns:
+        tSNE plots, ploted by calling plot_embedding function
     """
 
     # Setup the network
-    #feature_extractor.eval()
-    #class_classifier.eval()
     base_network.eval()
     if domain_classifier is not None:
         domain_classifier.eval()
