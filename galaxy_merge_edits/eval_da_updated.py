@@ -21,8 +21,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import network
-import loss
 import random
 import json
 import pickle as pkl
@@ -32,11 +30,15 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
-from galaxy_utils import image_classification_test, distance_classification_test 
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 from sklearn.manifold import TSNE
 from sklearn.metrics import confusion_matrix
+
+# Importing functions from our other files
+import network
+import loss
+from galaxy_utils import image_classification_test, distance_classification_test 
 from import_and_normalize import array_to_tensor, update
 
 
