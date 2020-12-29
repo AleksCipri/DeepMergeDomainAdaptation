@@ -1,3 +1,4 @@
+# Importing needed packages
 import numpy as np
 import torch
 import torch.nn as nn
@@ -9,6 +10,13 @@ from sklearn.metrics import pairwise_distances, pairwise
 
 
 def EntropyLoss(input_):
+    '''
+    Entropy minimizaiton loss
+    Args:
+        input_: network outputs
+    Rerurns:
+        entrpy based on network utputs
+    '''
     mask = input_.ge(0.000001)
     mask_out = torch.masked_select(input_, mask)
     entropy = -(torch.sum(mask_out * torch.log(mask_out)))
@@ -16,12 +24,14 @@ def EntropyLoss(input_):
 
 
 def PADA(features, ad_net, grl_layer, weight_ad, use_gpu=True):
-    '''domain adversarial loss
+    '''Domain adversarial loss
     Args: 
         features: torch.FloatTensor, concatenated source domain and target domain features
         ad_net: nn.Module, domain classification network
         grl_layer: gradient reversal layer
         weight_ad: torch.FloatTensor, weight of each sample, default all 1's
+    Returns:
+        Binary cross-entropy loss outputs for domain classification
     '''
     ad_out, _ = ad_net(grl_layer.apply(features))
     batch_size = int(ad_out.size(0) / 2)
@@ -31,46 +41,6 @@ def PADA(features, ad_net, grl_layer, weight_ad, use_gpu=True):
         dc_target = dc_target.cuda()
         weight_ad = weight_ad.cuda()
     return nn.BCELoss(weight=weight_ad.view(-1))(ad_out.view(-1), dc_target.view(-1))
-
-
-def CORAL(source, target):
-    '''CORAL loss
-       https://github.com/SSARCandy/DeepCORAL/blob/master/models.py
-    '''
-    batch_size, d = source.size()  # assume that source, target are 2d tensors
-
-    # source covariance
-    xm = torch.mean(source, 0, keepdim=True) - source
-    xc = (1. / (batch_size - 1)) * torch.matmul(xm.t(), xm)
-
-    # target covariance
-    xmt = torch.mean(target, 0, keepdim=True) - target
-    xct = (1. / (batch_size - 1)) * torch.matmul(xmt.t(), xmt)
-
-    # frobenius norm between source and target
-    loss = torch.mean(torch.mul((xc - xct), (xc - xct)))
-    # loss = loss / (4*d*d)
-
-    return loss
-
-
-def guassian_kernel(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
-    n_samples = int(source.size()[0]) + int(target.size()[0])
-    total = torch.cat([source, target], dim=0)
-    total0 = total.unsqueeze(0).expand(
-        int(total.size(0)), int(total.size(0)), int(total.size(1)))
-    total1 = total.unsqueeze(1).expand(
-        int(total.size(0)), int(total.size(0)), int(total.size(1)))
-    L2_distance = ((total0 - total1)**2).sum(2)
-    if fix_sigma:
-        bandwidth = fix_sigma
-    else:
-        bandwidth = torch.sum(L2_distance.data) / (n_samples**2 - n_samples)
-    bandwidth /= kernel_mul ** (kernel_num // 2)
-    bandwidth_list = [bandwidth * (kernel_mul**i) for i in range(kernel_num)]
-    kernel_val = [torch.exp(-L2_distance / bandwidth_temp)
-                  for bandwidth_temp in bandwidth_list]
-    return sum(kernel_val)  # /len(kernel_val)
 
 
 def compute_pairwise_distances(x, y):
@@ -84,25 +54,39 @@ def compute_pairwise_distances(x, y):
 
 
 def gaussian_kernel_matrix(x, y, sigmas):
-    beta = 1. / (2. * (torch.unsqueeze(sigmas, 1))) #what is beta
+    '''
+    Gaussian RBF kernel to be used in MMD
+    Args:
+    x,y: latent features
+    sigmas: free parameter that determins the width of the kernel
+    Returns:
+    '''
+    beta = 1. / (2. * (torch.unsqueeze(sigmas, 1)))
     dist = compute_pairwise_distances(x, y)
-    # print('dist shape={}'.format(dist.size()))
     s = torch.matmul(beta, dist.contiguous().view(1, -1))
     return torch.sum(torch.exp(-s), 0).view(*dist.size())
 
 
-#this is their equivalent to D(X,Y, Fancy F)
 def maximum_mean_discrepancy(x, y, kernel=gaussian_kernel_matrix):
+    ''' 
+    Calculate the matrix that includes all kernels k(xx), k(y,y) and k(x,y)
+    '''
     cost = torch.mean(kernel(x, x))
     cost += torch.mean(kernel(y, y))
     cost -= 2 * torch.mean(kernel(x, y))
-    # We do not allow the loss to become negative. #should we absolute value instead?
+    # We do not allow the loss to become negative. 
     cost = torch.clamp(cost, min=0.0)
     return cost
 
 
 def mmd_distance(hs, ht):
-    '''maximum mean discrepancy, a combination of multiple kernels
+    '''
+    Maximum Mean Discrepancy - MMD
+    Args:
+        hs: source domain embeddings
+        ht: target domain embeddings
+    Returns:
+        MMD value
     '''
     sigmas = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 5,
               10, 15, 20, 25, 30, 35, 100, 1e3, 1e4, 1e5, 1e6]
@@ -113,7 +97,7 @@ def mmd_distance(hs, ht):
 
 
 class FisherTD(nn.Module):
-    """MMC loss by auto-grad
+    '''Fisher loss in trace differenc forme. MMC loss by auto-grad
     adapted from: https://github.com/KaiyangZhou/pytorch-center-loss/blob/master/center_loss.py
 
     Reference:
@@ -122,7 +106,7 @@ class FisherTD(nn.Module):
     Args:
         num_classes (int): number of classes.
         feat_dim (int): feature dimension.
-    """
+    '''
 
     def __init__(self, num_classes=10, feat_dim=2, use_gpu=True):
         super(FisherTD, self).__init__()
@@ -138,7 +122,7 @@ class FisherTD(nn.Module):
                 torch.randn(self.num_classes, self.feat_dim))
 
     def forward(self, x, labels, inter_class="global", intra_loss_weight=1.0, inter_loss_weight=0.0):
-        """
+        '''
         Args:
             x: feature matrix with shape (batch_size, feat_dim).
             labels: ground truth labels with shape (batch_size).
@@ -146,7 +130,7 @@ class FisherTD(nn.Module):
                          if inter_class=="global", calculate intra class distance by distances of centers and global center. 
                          if inter_class=="sample", calculate intra class distance by distances of samples and centers of different classes. 
             intra_loss_weight: float, default=1.0
-        """
+        '''
         batch_size = x.size(0)
 
         distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes) + \
@@ -183,7 +167,7 @@ class FisherTD(nn.Module):
 
 
 class FisherTR(nn.Module):
-    """ Fisher loss in Trace Ratio form
+    ''' Fisher loss in Trace Ratio form
     adapted from: https://github.com/KaiyangZhou/pytorch-center-loss/blob/master/center_loss.py
 
     Reference:
@@ -192,7 +176,7 @@ class FisherTR(nn.Module):
     Args:
         num_classes (int): number of classes.
         feat_dim (int): feature dimension.
-    """
+    '''
 
     def __init__(self, num_classes=10, feat_dim=2, use_gpu=True):
         super(FisherTR, self).__init__()
@@ -208,7 +192,7 @@ class FisherTR(nn.Module):
                 torch.randn(self.num_classes, self.feat_dim))
 
     def forward(self, x, labels, inter_class="global", intra_loss_weight=1.0, inter_loss_weight=1.0):
-        """
+        '''
         Args:
             x: feature matrix with shape (batch_size, feat_dim).
             labels: ground truth labels with shape (batch_size).
@@ -216,7 +200,7 @@ class FisherTR(nn.Module):
                          if inter_class=="global", calculate intra class distance by distances of centers and global center. 
                          if inter_class=="sample", calculate intra class distance by distances of samples and centers of different classes. 
             intra_loss_weight: float, default=1.0
-        """
+        '''
         batch_size = x.size(0)
 
         distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes) + \
