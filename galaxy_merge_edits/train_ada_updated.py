@@ -36,15 +36,15 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import tensorboardX
-import network
-import loss
-import lr_schedule
 import torchvision.transforms as transform
 from tensorboardX import SummaryWriter
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 
 # Importing functions from our other files
+import network
+import loss
+import lr_schedule
 from galaxy_utils import EarlyStopping, distance_classification_test, image_classification_test, domain_cls_accuracy, visualizePerformance
 from import_and_normalize import array_to_tensor, update
 from visualize import plot_grad_flow, plot_learning_rate_scan
