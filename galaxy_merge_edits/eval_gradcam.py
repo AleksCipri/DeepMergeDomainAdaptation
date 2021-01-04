@@ -1,3 +1,4 @@
+# Importing packages
 import argparse
 import os
 import os.path as osp
@@ -19,7 +20,7 @@ import sys
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 from import_and_normalize import array_to_tensor, update
-from grad_cam import (GradCAM, GuidedBackPropagation) #maybe you need parenthesis for objects?
+from grad_cam import (GradCAM, GuidedBackPropagation)
 from main import save_gradcam, save_gradient
 
 def cam(config):
@@ -32,7 +33,6 @@ def cam(config):
     dsets = {}
     # dset_loaders = {}
 
-    #sampling WOR, i guess we leave the 10 in the middle to validate?
     pristine_indices = torch.randperm(len(pristine_x))
     pristine_x_test = pristine_x[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
     pristine_y_test = pristine_y[pristine_indices[int(np.floor(.8*len(pristine_x))):]]
@@ -60,19 +60,18 @@ def cam(config):
     if use_gpu:
         base_network = base_network.cuda()
 
-        #might not get to tstack this?
         source_images = torch.stack(list(dsets["source"])).cuda()
         target_images = torch.stack(list(dsets["target"])).cuda()
 
     base_network.train(False)
 
     model_name = config["network"]
-    target_layer = config["target_layer"] #no idea... maybe i can print this out? layer4 for resnet, relu for deepemerge
+    target_layer = config["target_layer"] #layer4 for resnet, relu for deepemerge
     
     if config["class"] == 'non-merger':
         target_class = 0 #non-merger
     elif config["class"] == 'merger':
-        target_class = 1 #non-merger
+        target_class = 1 #merger
     else:
         print("incorrect class choice")
         sys.exit()
@@ -94,7 +93,6 @@ def cam(config):
         probs, ids = gcam.forward(source_images) #see how they load in images
         _ = gbp.forward(source_images) #see if you need to catch anything
 
-        #not sure what to do about this
         if use_gpu:
             ids_ = torch.LongTensor([[target_class]] * len(source_images)).cuda()
         else:
@@ -106,30 +104,6 @@ def cam(config):
         gradients = gbp.generate()
         regions = gcam.generate(target_layer=target_layer)
 
-        # print("ids")
-        # print(ids)
-        # print("probs")
-        # print(probs)
-        # # print("argmax")
-        # # print(torch.argmax(ids, dim = 1))
-        # # print("equality")
-        # # print(torch.argmax(ids, dim = 1).cpu() == target_class)
-        # # print(probs)
-        # # print(probs[(torch.argmax(ids, dim = 1).cpu() == target_class).cpu()])
-        # # print(probs.cpu()[(torch.argmax(ids, dim = 1).cpu() == target_class).cpu()])
-        # #print(torch.argmax(probs, dim = 1).cpu() == target_class)
-        # print("try 1")
-        # print(probs[[torch.tensor(torch.argmax(ids, dim = 1).cpu() == target_class)]])
-        # print("try 2")
-        
-        # a = probs[[torch.tensor(torch.argmax(ids, dim = 1).cpu() == target_class)]]
-        # print(a[:, target_class])
-
-        # a = probs[[torch.tensor(torch.argmax(ids, dim = 1).cpu() == target_class)]]
-        # a = a[:, target_class]
-
-        # print(len(regions))
-        # print(len(source_images)-1)
 
         for j in range(0, len(source_images)-1):
 
@@ -165,7 +139,6 @@ def cam(config):
         probs, ids = gcam.forward(target_images) #see how they load in images
         _ = gbp.forward(target_images) #see if you need to catch anything
 
-        #not sure what to do about this
         if use_gpu:
             ids_ = torch.LongTensor([[target_class]] * len(target_images)).cuda()
         else:
@@ -215,7 +188,7 @@ def cam(config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Evaluate DA models.')
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
-    parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18,34,50,101,152; AlexNet")
+    parser.add_argument('--net', type=str, default='ResNet50', help="Options: ResNet18, DeepMerge")
     parser.add_argument('--dset', type=str, default='galaxy', help="The dataset or source dataset used")
     parser.add_argument('--ckpt_path', type=str, required=True, help="path to load ckpt")
     parser.add_argument('--dset_path', type=str, default=None, help="The dataset directory path")
