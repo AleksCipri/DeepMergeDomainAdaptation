@@ -42,6 +42,26 @@ def PADA(features, ad_net, grl_layer, weight_ad, use_gpu=True):
         weight_ad = weight_ad.cuda()
     return nn.BCELoss(weight=weight_ad.view(-1))(ad_out.view(-1), dc_target.view(-1))
 
+def CORAL(source, target):
+    '''CORAL loss
+       https://github.com/SSARCandy/DeepCORAL/blob/master/models.py
+    '''
+    batch_size, d = source.size()  # assume that source, target are 2d tensors
+
+    # source covariance
+    xm = torch.mean(source, 0, keepdim=True) - source
+    xc = (1. / (batch_size - 1)) * torch.matmul(xm.t(), xm)
+
+    # target covariance
+    xmt = torch.mean(target, 0, keepdim=True) - target
+    xct = (1. / (batch_size - 1)) * torch.matmul(xmt.t(), xmt)
+
+    # frobenius norm between source and target
+    loss = torch.mean(torch.mul((xc - xct), (xc - xct)))
+    # loss = loss / (4*d*d)
+
+    return loss
+
 
 def compute_pairwise_distances(x, y):
     if not x.dim() == y.dim() == 2:
