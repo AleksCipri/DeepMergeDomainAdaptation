@@ -142,6 +142,21 @@ def train(config):
     net_config = config["network"]
     base_network = net_config["name"](**net_config["params"])
 
+    #Loading trained model if we want:
+    if config["ckpt_path"] is not None:
+        print('load model from {}'.format(config['ckpt_path']))
+        ckpt = torch.load(config['ckpt_path']+'/best_model.pth.tar')
+        base_network.load_state_dict(ckpt['base_network'])
+
+        # i = 0
+        # for param in base_network.parameters():
+        #     if i < 6:
+        #         param.requires_grad = False
+        #         #print(param)
+        #     #else:
+        #         #print(param)
+        #     i+=1
+
     use_gpu = torch.cuda.is_available()
     if use_gpu:
         base_network = base_network.cuda()
@@ -577,6 +592,7 @@ if __name__ == "__main__":
     parser.add_argument('--blobs', type=str, default=None, help='Plot tSNE plots.')
     parser.add_argument('--fisher_or_no', type=str, default='Fisher', help='Run the code without fisher loss')
     parser.add_argument('--seed', type=int, default=3, help='Set random seed.')
+    parser.add_argument('--ckpt_path', type=str, default=None, help="path to load ckpt")
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -642,7 +658,11 @@ if __name__ == "__main__":
     # One-cycle parameters
     if args.one_cycle is not None:
         config["optimizer"]["lr_type"] = "one-cycle"
- 
+
+    # Set up loading of the pretrained model if we want to do TL
+    if args.ckpt_path is not None:
+        config["ckpt_path"] = args.ckpt_path
+
     # Set paramaters needed for lr_scan
     if args.lr_scan == 'yes':
         config["optimizer"]["lr_type"] = "linear"
