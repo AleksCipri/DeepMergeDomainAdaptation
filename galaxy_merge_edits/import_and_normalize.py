@@ -66,10 +66,19 @@ def update(t1, t2):
     std3 = t[:,2].std().item()
 
     return np.array([[mean1, mean2, mean3], [std1, std2, std3]])
+  
+  #find pixel means and stds for a given dataset
+  # pristine = normalization(t1)
+  # noisy = normalization(t2)
+  # #print("pristine:",pristine)
+  # #print("noisy:",noisy)
+  # pr_trf = transform.Normalize(mean = pristine[0], std = pristine[1], inplace=True)
+  # no_trf = transform.Normalize(mean = noisy[0], std = noisy[1], inplace=True)
 
-  pristine = normalization(t1)
-  noisy = normalization(t2)
-
+  #in case of transfer learning we have to normalize new images to old means and stds so we just directly input these numbers here
+  
+  pristine = [[0.0375126, 0.03326255, 0.06786563],[1.30893517, 1.02839041, 1.12307501]]
+  noisy = [[0.03749673, 0.03331003, 0.06772753],[1.37418461, 1.16330922, 1.19831419]]
   pr_trf = transform.Normalize(mean = pristine[0], std = pristine[1], inplace=True)
   no_trf = transform.Normalize(mean = noisy[0], std = noisy[1], inplace=True)
 
@@ -78,3 +87,19 @@ def update(t1, t2):
   
   for i in range(0, len(t2)-1):
       no_trf(t2[i])
+
+
+"""
+Distant galaxies z=2:
+pristine: [[0.0375126  0.03326255 0.06786563]
+ [1.30893517 1.02839041 1.12307501]] mean
+noisy: [[0.03749673 0.03331003 0.06772753]
+ [1.37418461 1.16330922 1.19831419]] std
+
+Nearby galaxies z=0 (0.25 time window dusty images) and SDSS (postmergers):
+pristine: [[0.60699224 0.63178635 0.56252038]
+ [1.8455255  1.84083951 1.4652102 ]] mean
+noisy: [[25.81263733 21.12583733 14.25884247]
+ [35.08432007 29.94885445 19.8165493 ]] std
+
+"""
