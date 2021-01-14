@@ -167,7 +167,7 @@ def train(config):
         #     #else:
         #         #print(param)
         #     i+=1
-        ad_net.load_state_dict(ckpt['ad_net'])
+        #ad_net.load_state_dict(ckpt['ad_net'])
 
     # Class weights in case we need them, hewe we have balanced sample so weights are 1.0
     class_weight = torch.from_numpy(np.array([1.0] * class_num))
