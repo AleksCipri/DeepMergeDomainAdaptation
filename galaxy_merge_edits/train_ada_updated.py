@@ -153,6 +153,22 @@ def train(config):
     if use_gpu:
         ad_net = ad_net.cuda()
 
+    #Loading trained model if we want:
+    if config["ckpt_path"] is not None:
+        print('load model from {}'.format(config['ckpt_path']))
+        ckpt = torch.load(config['ckpt_path']+'/best_model.pth.tar')
+        base_network.load_state_dict(ckpt['base_network'])
+
+        # i = 0
+        # for param in base_network.parameters():
+        #     if i < 6:
+        #         param.requires_grad = False
+        #         #print(param)
+        #     #else:
+        #         #print(param)
+        #     i+=1
+        ad_net.load_state_dict(ckpt['ad_net'])
+
     # Class weights in case we need them, hewe we have balanced sample so weights are 1.0
     class_weight = torch.from_numpy(np.array([1.0] * class_num))
     if use_gpu:
@@ -623,6 +639,7 @@ if __name__ == "__main__":
     parser.add_argument('--ad_net_mult_lr', type=float, default = .1, help= 'Multiply base net lr by this to get ad net lr.')
     parser.add_argument('--blobs', type=str, default=None, help='Plot tSNE plots.')
     parser.add_argument('--seed', type=int, default=3, help='Set random seed.')
+    parser.add_argument('--ckpt_path', type=str, default=None, help="path to load ckpt")
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
@@ -697,6 +714,10 @@ if __name__ == "__main__":
         config["ad_net_mult_lr"] = 1
     else:
         config["ad_net_mult_lr"] = args.ad_net_mult_lr
+
+    # Set up loading of the pretrained model if we want to do TL
+    if args.ckpt_path is not None:
+        config["ckpt_path"] = args.ckpt_path
 
     # Set paramaters needed for lr_scan
     if args.lr_scan == "yes":
