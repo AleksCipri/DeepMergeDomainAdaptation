@@ -235,6 +235,7 @@ def train(config):
             
             snapshot_obj = {'epoch': i/len(dset_loaders["source"]), 
                             "base_network": base_network.state_dict(), 
+                            "ad_net": ad_net.state_dict(),
                             'valid accuracy': temp_acc,
                             'train accuracy' : train_acc,                            
                             }
