@@ -111,16 +111,20 @@ def cam(config):
             plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
             plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
             plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            plt.savefig(osp.join(
-                output_dir,
-                "image{}-{}.png".format(j, classes[target_class])))
+            # plt.savefig(osp.join(
+            #     output_dir,
+            #     "image{}-{}.png".format(j, classes[target_class])))
+            # with open(osp.join(output_dir, "image{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
+            #     np.save(f, np.asarray(image))
 
             #Saving Grad-CAMs without overplotted image
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
-            cv2.imwrite(osp.join(
-                output_dir,
-                "{}-{}.png".format(j, classes[target_class])), image)
+            # cv2.imwrite(osp.join(
+            #     output_dir,
+            #     "{}-{}.png".format(j, classes[target_class])), image)
 
+            with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
+                np.save(f, np.asarray(image))
 
     elif config["which"] == 'target':
         print("start target test: ")
@@ -136,15 +140,17 @@ def cam(config):
             plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
             plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
             plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            plt.savefig(osp.join(
-                output_dir,
-                "image{}-{}.png".format(j, classes[target_class])))
+            # plt.savefig(osp.join(
+            #     output_dir,
+            #     "image{}-{}.png".format(j, classes[target_class])))
 
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
-            cv2.imwrite(osp.join(
-                output_dir,
-                "{}-{}.png".format(j, classes[target_class])), image)
+            # cv2.imwrite(osp.join(
+            #     output_dir,
+            #     "{}-{}.png".format(j, classes[target_class])), image)
 
+            with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
+                np.save(f, np.asarray(image))
 
     else:
         print("incorrect domain choice")
