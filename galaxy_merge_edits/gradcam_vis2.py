@@ -1,17 +1,3 @@
-'''
-!python gradcam_vis2.py --net 'DeepMerge' \
-                        --dset 'galaxy' \
-                        --dset_path '../../DeepMerge/small_20percent/' \
-                        --source_x_file 'Pristine_small_20percent.npy' \
-                        --source_y_file 'Pristine_small_labels_20percent.npy' \
-                        --target_x_file 'Noisy_small_20percent.npy' \
-                        --target_y_file 'Noisy_small_labels_20percent.npy' \
-                        --gpu_id 0 \
-                        --ckpt_path VM/noDA/noDA_seed1/ \
-                        --which 'source' \
-                        --classy 'non-merger'
-'''
-
 import argparse
 import os
 import os.path as osp
@@ -53,12 +39,19 @@ def cam(config):
 
     #sampling WOR, i guess we leave the 10 in the middle to validate?
     #pristine_indices = torch.randperm(len(pristine_x))
+
     pristine_x_test = pristine_x[int(np.floor(.98*len(pristine_x))):]
     pristine_y_test = pristine_y[int(np.floor(.98*len(pristine_x))):]
+    
+    #pristine_x_test = pristine_x[:30]
+    #pristine_y_test = pristine_y[:30]
 
     #noisy_indices = torch.randperm(len(noisy_x))
-    noisy_x_test = noisy_x[int(np.floor(.98*len(noisy_x))):]
-    noisy_y_test = noisy_y[int(np.floor(.98*len(noisy_x))):]
+     noisy_x_test = noisy_x[int(np.floor(.98*len(noisy_x))):]
+     noisy_y_test = noisy_y[int(np.floor(.98*len(noisy_x))):]
+
+    #noisy_x_test = noisy_x[:30]
+    #noisy_y_test = noisy_y[:30]
 
     dsets["source"] = pristine_x_test
     dsets["target"] = noisy_x_test
@@ -119,21 +112,24 @@ def cam(config):
             #Saving LogNorm galaxy images
             my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
             my_cmap.set_bad(my_cmap.colors[0])
-            # fig1=plt.figure(figsize=(8,8))
-            # plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            # plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            # plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            fig1=plt.figure(figsize=(8,8))
+            plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
             # plt.savefig(osp.join(
             #     output_dir,
             #     "image{}-{}.png".format(j, classes[target_class])))
+            # with open(osp.join(output_dir, "image{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
+            #     np.save(f, np.asarray(image))
 
             #Saving Grad-CAMs without overplotted image
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
+            # cv2.imwrite(osp.join(
+            #     output_dir,
+            #     "{}-{}.png".format(j, classes[target_class])), image)
 
-            cv2.imwrite(osp.join(
-                output_dir,
-                "{}-{}.png".format(j, classes[target_class])), image)
-
+            with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
+                np.save(f, np.asarray(image))
 
     elif config["which"] == 'target':
         print("start target test: ")
@@ -143,22 +139,27 @@ def cam(config):
             input_tensor = target_images[j]
             label = target_class
 
-            my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
-            my_cmap.set_bad(my_cmap.colors[0])
-            fig1=plt.figure(figsize=(8,8))
-            plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            plt.savefig(osp.join(
-                output_dir,
-                "image{}-{}.png".format(j, classes[target_class])))
+            #my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
+            #my_cmap.set_bad(my_cmap.colors[0])
+            #fig1=plt.figure(figsize=(8,8))
+            #plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            #plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            #plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            # plt.savefig(osp.join(
+            #     output_dir,
+            #     "image{}-{}.png".format(j, classes[target_class])))
+
+            with open(osp.join(output_dir, "{}-{}-IMAGE.npy".format(j, classes[target_class])), 'wb') as g:
+                np.save(g, np.asarray(input_tensor[0].cpu()))
 
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
+            # cv2.imwrite(osp.join(
+            #     output_dir,
+            #     "{}-{}.png".format(j, classes[target_class])), image)
 
-            cv2.imwrite(osp.join(
-               output_dir,
-               "{}-{}.png".format(j, classes[target_class])), image)
-
+            with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
+                np.save(f, np.asarray(image))
+            # plt.close('all')
 
     else:
         print("incorrect domain choice")
