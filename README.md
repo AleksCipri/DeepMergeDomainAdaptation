@@ -13,18 +13,22 @@ Our experiments were performed using a simple CNN architecture (3 convolutional,
 ### Prepare Datasets
 Images used can be found at XXXXXXXXXXXXXX. There are two tipes of experiments we run: Simulation to Simulation; and Simulation to Real.
 
-# Simulation to Simulation Experiments
+#### Simulation to Simulation Experiments
 Experiments study distant merging galaxies using simulated images from Illustris-1 cosmological simulation. Images have 3 filters that mimic Hubble Space Telescope (HST) observations (ACS F814W,NC F356W, WFC3 F160W).
 
 Source Domain - Illustris-1 images (snapshot z=2) with added PSF mimicking HST observations
+
      Images: SimSim_SOURCE_X_Illustris2_pristine.npy
+     
      Labels: SimSim_SOURCE_y_Illustris2_pristine.npy
 
 Target Domain -  Illustris-1 images (snapshot z=2) with added PSF and observational noise mimicking HST
+
     Images: SimSim_TARGET_X_Illustris2_noisy.npy
+    
     Labels: SimSim_TARGET_y_Illustris2_noisy.npy
 
-# Simulation to Real Experiments
+#### Simulation to Real Experiments
 Experiments study nearby merging galaxies using simulated Illustris-1 images and real Sloan Digital Sky Survey (SDSS) images. All images have 3 filters. SDSS images have (g,r,i) filters, while simulated Illustris images also mimic the same 3 filters.
 
 Source Domain - Illustris-1 images (snapshot z=0) with added effects of dust, PSF and observational noise mimicking SDSS observations
