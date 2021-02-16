@@ -2,26 +2,32 @@
 #!/bin/bash
 
 ARGS="--gpu_id 0"
-ARGS+=" --net ResNet18"
+ARGS+=" --net DeepMerge"
 ARGS+=" --dset galaxy"
-ARGS+=" --dset_path /Users/perdue/Dropbox/HVAI/DeepMergeDomainAdaptation/galaxy_merge_edits/small"
-ARGS+=" --pristine_xfile Pristine_small.npy"
-ARGS+=" --pristine_yfile Pristine_small_labels.npy"
-ARGS+=" --noisy_xfile Noisy_small.npy"
-ARGS+=" --noisy_yfile Noisy_small_labels.npy"
-ARGS+=" --test_interval 500"
-ARGS+=" --snapshot_interval 10000"
+ARGS+=" --dset_path arrays"
+ARGS+=" --pristine_xfile Xdata_source.npy"
+ARGS+=" --pristine_yfile ydata_source.npy"
+ARGS+=" --noisy_xfile Xdata_target.npy"
+ARGS+=" --noisy_yfile ydata_target.npy"
 ARGS+=" --ly_type cosine"
 ARGS+=" --loss_type mmd"
-ARGS+=" --fisher_loss_type tr"
-ARGS+=" --output_dir gnp_output"
-ARGS+=" --em_loss_coef 0.1"
-ARGS+=" --inter_loss_coef 1."
-ARGS+=" --intra_loss_coef 1."
-ARGS+=" --trade_off 1."
-ARGS+=" --optim_choice 'SGD'"
+ARGS+=" --one_cycle yes"
+ARGS+=" --lr 0.001"
+ARGS+=" --epoch 200"
+ARGS+=" --early_stop_patience 20"
+ARGS+=" --weight_decay 0.001"
+ARGS+=" --optim_choice Adam"
+ARGS+=" --seed 1"
+ARGS+=" --trade_off 1.0"
+ARGS+=" --fisher_or_no Fisher"
+ARGS+=" --em_loss_coef 0.05"
+ARGS+=" --inter_loss_coef 1.0"
+ARGS+=" --intra_loss_coef 0.01"
+ARGS+=" --blobs yes"
+ARGS+=" --grad_vis yes"
+ARGS+=" --ckpt_path output_DeepMerge_SDSS"
 
 cat << EOF
-python galaxy_train.py $ARGS
+python train_MMD.py $ARGS
 EOF
-python galaxy_train.py $ARGS
+python train_MMD.py $ARGS
