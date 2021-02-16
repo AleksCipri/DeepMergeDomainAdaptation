@@ -24,7 +24,7 @@ from PIL import Image
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 from import_and_normalize import array_to_tensor, update
-from grad_cam2 import grad_cam
+from grad_cam import grad_cam
 from main import save_gradcam, save_gradient
 
 def cam(config):
