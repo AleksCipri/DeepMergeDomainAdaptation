@@ -28,13 +28,10 @@ def superimpose(input_img, heatmap):
     img = cv2.resize(img, (150,150))
     heatmap = cv2.resize(heatmap, (150,150))
     heatmap = np.uint8(255 * heatmap)
-    #heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_HOT)
     heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_VIRIDIS)
     #superimposed_img = np.uint8(heatmap * 0.2 + img * 0.8)
-    superimposed_img = np.uint8(heatmap * 1.0 + img * 0.0) #remove overplotting of the galaxy image
+    superimposed_img = np.uint8(heatmap * 1.0 + img * 0.0) #removed overplotting of the galaxy image
     pil_img = cv2.applyColorMap(superimposed_img, cv2.COLORMAP_VIRIDIS)
-    #pil_img = cv2.applyColorMap(superimposed_img, cv2.COLORMAP_HOT)
-    #pil_img = cv2.cvtColor(superimposed_img,cv2.COLOR_BGR2RGB)
     return pil_img
     #return heatmap
     
@@ -52,10 +49,6 @@ def grad_cam(model, input_tensor, heatmap_layer, truelabel):
     heatmap_layer.register_forward_hook(info.hook)
     
     features, logits = model(input_tensor.unsqueeze(0))
-    #print("logits",logits)
-
-    #truelabel = truelabel if truelabel else torch.argmax(output)
-    #print("logits0",logits[0][truelabel])
 
     output = logits[0][truelabel].cpu()
 
@@ -71,14 +64,7 @@ def grad_cam(model, input_tensor, heatmap_layer, truelabel):
     heatmap = generate_heatmap(weighted_activation)
     input_image = to_RGB(input_tensor.cpu())
 
-    #print(heatmap)
-    #print(input_image)
-    #print(np.shape(heatmap))
-    #print(np.shape(input_image))
-    #im = input_tensor.cpu()
-    #np.save('input_image.npy', im)
-    #np.save('heatmap.npy', heatmap)
-
     #return superimpose(input_image, heatmap)
-    return heatmap
 
+    #we want to return only gradcam because overplotting images makes everything less visible
+    return heatmap
