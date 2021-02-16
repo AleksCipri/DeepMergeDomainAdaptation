@@ -35,23 +35,15 @@ def cam(config):
     classes[1] = 'merger'
 
     dsets = {}
-    # dset_loaders = {}
-
-    #sampling WOR, i guess we leave the 10 in the middle to validate?
-    #pristine_indices = torch.randperm(len(pristine_x))
-
+    
+    #Loading final 20% of the data (test set)
     pristine_x_test = pristine_x[int(np.floor(.98*len(pristine_x))):]
     pristine_y_test = pristine_y[int(np.floor(.98*len(pristine_x))):]
-    
-    #pristine_x_test = pristine_x[:30]
-    #pristine_y_test = pristine_y[:30]
+
 
     #noisy_indices = torch.randperm(len(noisy_x))
-     noisy_x_test = noisy_x[int(np.floor(.98*len(noisy_x))):]
-     noisy_y_test = noisy_y[int(np.floor(.98*len(noisy_x))):]
-
-    #noisy_x_test = noisy_x[:30]
-    #noisy_y_test = noisy_y[:30]
+    noisy_x_test = noisy_x[int(np.floor(.98*len(noisy_x))):]
+    noisy_y_test = noisy_y[int(np.floor(.98*len(noisy_x))):]
 
     dsets["source"] = pristine_x_test
     dsets["target"] = noisy_x_test
@@ -79,7 +71,6 @@ def cam(config):
     base_network.train(False)
 
     model_name = config["network"]
-    #target_layer = config["target_layer"] #no idea... maybe i can print this out? layer4 for resnet, relu for deepemerge
     
     if config["class"] == 'non-merger':
         target_class = 0 #non-merger
@@ -109,25 +100,27 @@ def cam(config):
             input_tensor = source_images[j]
             label = target_class
 
-            #Saving LogNorm galaxy images
-            my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
-            my_cmap.set_bad(my_cmap.colors[0])
-            fig1=plt.figure(figsize=(8,8))
-            plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            ## Saving LogNorm galaxy images
+            # my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
+            # my_cmap.set_bad(my_cmap.colors[0])
+            # fig1=plt.figure(figsize=(8,8))
+            # plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            # plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            # plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
             # plt.savefig(osp.join(
             #     output_dir,
             #     "image{}-{}.png".format(j, classes[target_class])))
             # with open(osp.join(output_dir, "image{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
             #     np.save(f, np.asarray(image))
 
-            #Saving Grad-CAMs without overplotted image
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
+            #Saving Grad-CAMs without overplotted galaxy image
+            ## in case we want to save it as image
             # cv2.imwrite(osp.join(
             #     output_dir,
             #     "{}-{}.png".format(j, classes[target_class])), image)
 
+            #saving Grad-CAMs as numpy arrays
             with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
                 np.save(f, np.asarray(image))
 
