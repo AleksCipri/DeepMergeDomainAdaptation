@@ -45,7 +45,10 @@ Target Domain - SDSS images of merging galaxies, labeled through Galaxy Zoo proj
 
 
 ### Training
-Explanation how to run different versions of training as well as evaluation are given in example notebook: Running_DeepMergeDomainAdaptation_files.ipynb 
+Explanation how to run different versions of training as well as evaluation are given in example notebook: 
+```
+Running_DeepMergeDomainAdaptation_files.ipynb 
+```
 
 
 ### Requirements
