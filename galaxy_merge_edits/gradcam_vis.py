@@ -99,6 +99,25 @@ def cam(config):
             # saving Grad-CAMs as numpy arrays
             with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
                 np.save(f, np.asarray(image))
+            
+            ## Saving LogNorm galaxy images (uncomment if you want to save in image form)
+            # my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
+            # my_cmap.set_bad(my_cmap.colors[0])
+            # fig1=plt.figure(figsize=(8,8))
+            # plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            # plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            # plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            # plt.savefig(osp.join(
+            #     output_dir,
+            #     "image{}-{}.png".format(j, classes[target_class])))
+            # with open(osp.join(output_dir, "image{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
+            #     np.save(f, np.asarray(image))
+                
+            #Saving Grad-CAMs without overplotted galaxy image (uncomment if you want to save in image form)
+            ## in case we want to save it as image
+            # cv2.imwrite(osp.join(
+            #     output_dir,
+            #     "{}-{}.png".format(j, classes[target_class])), image)
 
     elif config["which"] == 'target':
         print("start target test: ")
@@ -111,6 +130,25 @@ def cam(config):
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
             with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
                 np.save(f, np.asarray(image))
+                
+            ## Saving LogNorm galaxy images (uncomment if you want to save in image form)
+            # my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
+            # my_cmap.set_bad(my_cmap.colors[0])
+            # fig1=plt.figure(figsize=(8,8))
+            # plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            # plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            # plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
+            # plt.savefig(osp.join(
+            #     output_dir,
+            #     "image{}-{}.png".format(j, classes[target_class])))
+            # with open(osp.join(output_dir, "image{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
+            #     np.save(f, np.asarray(image))
+                
+            #Saving Grad-CAMs without overplotted galaxy image (uncomment if you want to save in image form)
+            ## in case we want to save it as image
+            # cv2.imwrite(osp.join(
+            #     output_dir,
+            #     "{}-{}.png".format(j, classes[target_class])), image) 
 
     else:
         print("incorrect domain choice")
