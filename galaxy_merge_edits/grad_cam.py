@@ -17,34 +17,42 @@ class InfoHolder():
         self.activation = output.detach()
 
 def generate_heatmap(weighted_activation):
+    '''
+    Function that generates a heatmap from the weighted activations
+    '''
     raw_heatmap = torch.mean(weighted_activation, 0)
     heatmap = np.maximum(raw_heatmap.detach().cpu(), 0)
     heatmap /= torch.max(heatmap) + 1e-10
     return heatmap.numpy()
 
 def superimpose(input_img, heatmap):
+    '''
+    Function that superimposes Grad-CAMs on top of the image
+    '''
     img = cv2.cvtColor(input_img,cv2.COLOR_BGR2RGB)
-    #heatmap = cv2.resize(heatmap, (img.shape[0], img.shape[1]))
     img = cv2.resize(img, (150,150))
     heatmap = cv2.resize(heatmap, (150,150))
     heatmap = np.uint8(255 * heatmap)
     heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_VIRIDIS)
-    #superimposed_img = np.uint8(heatmap * 0.2 + img * 0.8)
-    superimposed_img = np.uint8(heatmap * 1.0 + img * 0.0) #removed overplotting of the galaxy image
+    superimposed_img = np.uint8(heatmap * 0.2 + img * 0.8)
     pil_img = cv2.applyColorMap(superimposed_img, cv2.COLORMAP_VIRIDIS)
     return pil_img
-    #return heatmap
     
 
 def to_RGB(tensor):
+    '''
+    Function to convert image to RGB in case we are interested in saving plots as images
+    '''
     tensor = (tensor - tensor.min())
     tensor = tensor/(tensor.max() + 1e-10)
     image_binary = np.transpose(tensor.numpy(), (1, 2, 0))
-    #print(image_binary)
     image = np.uint8(255 * image_binary)
     return image
 
 def grad_cam(model, input_tensor, heatmap_layer, truelabel):
+    '''
+    Function that creates final Grad-CAM using the activations from a specified network layer.
+    '''
     info = InfoHolder(heatmap_layer)
     heatmap_layer.register_forward_hook(info.hook)
     
@@ -64,6 +72,7 @@ def grad_cam(model, input_tensor, heatmap_layer, truelabel):
     heatmap = generate_heatmap(weighted_activation)
     input_image = to_RGB(input_tensor.cpu())
 
+    #in case we want to output superimposed images and grad-cam we can return this instead
     #return superimpose(input_image, heatmap)
 
     #we want to return only gradcam because overplotting images makes everything less visible
