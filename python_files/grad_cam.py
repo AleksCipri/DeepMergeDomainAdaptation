@@ -1,8 +1,12 @@
+#Import needed packages
 import cv2
 import torch
 import numpy as np
 
 class InfoHolder():
+    '''
+    Must register hook in order to track gradients. Inspired by: https://github.com/jacobgil/pytorch-grad-cam.
+    '''
 
     def __init__(self, heatmap_layer):
         self.gradient = None
@@ -18,7 +22,7 @@ class InfoHolder():
 
 def generate_heatmap(weighted_activation):
     '''
-    Function that generates a heatmap from the weighted activations
+    Function that generates a heatmap from the weighted activations. Inspired by: https://github.com/jacobgil/pytorch-grad-cam.
     '''
     raw_heatmap = torch.mean(weighted_activation, 0)
     heatmap = np.maximum(raw_heatmap.detach().cpu(), 0)
@@ -27,7 +31,7 @@ def generate_heatmap(weighted_activation):
 
 def superimpose(input_img, heatmap):
     '''
-    Function that superimposes Grad-CAMs on top of the image
+    Function that superimposes Grad-CAMs on top of the image. Inspired by: https://github.com/jacobgil/pytorch-grad-cam.
     '''
     img = cv2.cvtColor(input_img,cv2.COLOR_BGR2RGB)
     img = cv2.resize(img, (150,150))
@@ -38,10 +42,9 @@ def superimpose(input_img, heatmap):
     pil_img = cv2.applyColorMap(superimposed_img, cv2.COLORMAP_VIRIDIS)
     return pil_img
     
-
 def to_RGB(tensor):
     '''
-    Function to convert image to RGB in case we are interested in saving plots as images
+    Function to convert image to RGB in case we are interested in saving plots as images. Inspired by: https://github.com/jacobgil/pytorch-grad-cam.
     '''
     tensor = (tensor - tensor.min())
     tensor = tensor/(tensor.max() + 1e-10)
@@ -51,7 +54,7 @@ def to_RGB(tensor):
 
 def grad_cam(model, input_tensor, heatmap_layer, truelabel):
     '''
-    Function that creates final Grad-CAM using the activations from a specified network layer.
+    Function that creates final Grad-CAM using the activations from a specified network layer. Inspired by: https://github.com/jacobgil/pytorch-grad-cam.
     '''
     info = InfoHolder(heatmap_layer)
     heatmap_layer.register_forward_hook(info.hook)
