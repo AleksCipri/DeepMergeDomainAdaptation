@@ -110,10 +110,11 @@ def cam(config):
             # plt.savefig(osp.join(
             #     output_dir,
             #     "image{}-{}.png".format(j, classes[target_class])))
+            ## Save galaxy image as npy array if needed:
             # with open(osp.join(output_dir, "image{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
             #     np.save(f, np.asarray(image))
                 
-            #Saving Grad-CAMs without overplotted galaxy image (uncomment if you want to save in image form)
+            ## Saving Grad-CAMs without overplotted galaxy image (uncomment if you want to save in image form)
             ## in case we want to save it as image
             # cv2.imwrite(osp.join(
             #     output_dir,
@@ -141,6 +142,7 @@ def cam(config):
             # plt.savefig(osp.join(
             #     output_dir,
             #     "image{}-{}.png".format(j, classes[target_class])))
+            ## Save galaxy image as npy array if needed:
             # with open(osp.join(output_dir, "image{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
             #     np.save(f, np.asarray(image))
                 
