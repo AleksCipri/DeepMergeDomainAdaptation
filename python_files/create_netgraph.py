@@ -1,3 +1,16 @@
+'''
+Run to create onnx file of your network. Open onnx file with network_graphs.ipynb. Example script to launch training: 
+!python create_netgraph.py --gpu_id 0 \
+                              --net DeepMerge \
+                              --dset 'galaxy' \
+                              --dset_path 'arrays/SDSS_Illustris_z0/' \
+                              --output_dir 'output_DeepMerge_SDSS/noDA' \
+                              --source_x_file Illustris_Xdata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                              --source_y_file Illustris_ydata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                              --target_x_file SDSS_x_data_postmergers_and_nonmergers.npy \
+                              --target_y_file SDSS_y_data_postmergers_and_nonmergers.npy \
+'''
+
 import network
 import torch
 import netron
@@ -9,8 +22,6 @@ import torchvision.transforms as transform
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 from import_and_normalize import array_to_tensor, update
-
-#Run to create onnx file of your network. Open onnx file with network_graphs.ipynb.
 
 def show_me_the_graphs(config):
 
