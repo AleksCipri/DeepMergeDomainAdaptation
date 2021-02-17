@@ -11,25 +11,25 @@ Here we implement domain adaptation to improve classification of simulated and r
 Our experiments were performed using a simple CNN architecture (3 convolutional, 3 pooling adn 3 danse layers) called DeepMerge, as well as using more complex and well known ResNet18 network.
 
 ### Prepare Datasets
-Images used can be found at XXXXXXXXXXXXXX. There are two tipes of experiments we run: Simulation to Simulation; and Simulation to Real.
+Images used can be found at Zenodo:..... There are two tipes of experiments we run: Simulation to Simulation; and Simulation to Real.
 
 #### Simulation to Simulation Experiments
-Experiments study distant merging galaxies using simulated images from Illustris-1 cosmological simulation. Images have 3 filters that mimic Hubble Space Telescope (HST) observations (ACS F814W,NC F356W, WFC3 F160W).
+Data used to study distant merging galaxies using simulated images from the Illustris-1 cosmological simulation at redshift z=2. The images are 75x75 pixels with three filters applied that mimic Hubble Space Telescope (HST) observations (ACS F814W,NC F356W, WFC3 F160W) with added point-spread function and with or without observational noise.
 
-Source Domain - Illustris-1 images (snapshot z=2) with added PSF mimicking HST observations
+Source Domain:
 
      - Images: SimSim_SOURCE_X_Illustris2_pristine.npy
      
      - Labels: SimSim_SOURCE_y_Illustris2_pristine.npy
 
-Target Domain -  Illustris-1 images (snapshot z=2) with added PSF and observational noise mimicking HST
+Target Domain:
 
     - Images: SimSim_TARGET_X_Illustris2_noisy.npy
     
     - Labels: SimSim_TARGET_y_Illustris2_noisy.npy
 
 #### Simulation to Real Experiments
-Experiments study nearby merging galaxies using simulated Illustris-1 images and real Sloan Digital Sky Survey (SDSS) images. All images have 3 filters. SDSS images have (g,r,i) filters, while simulated Illustris images also mimic the same 3 filters.
+Data used to study nearby merging galaxies using simulated Illustris-1 images at redshift z=0 and real Sloan Digital Sky Survey (SDSS) images from the Galaxy Zoo project. All images have three filters. SDSS images have (g,r,i) filters, while simulated Illustris images also mimic the same three SDSS filters with added effects of dust, point-spread function, and observational noise.
 
 Source Domain - Illustris-1 images (snapshot z=0) with added effects of dust, PSF and observational noise mimicking SDSS observations
 
