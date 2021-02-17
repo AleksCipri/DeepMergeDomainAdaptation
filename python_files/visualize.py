@@ -1,3 +1,5 @@
+#optional for plotting
+
 def plot_grad_flow(path, epoch, named_parameters):
     '''Plots the gradients flowing through different layers in the net during training.
     Can be used for checking for possible gradient vanishing / exploding problems.
@@ -38,7 +40,6 @@ def plot_grad_flow(path, epoch, named_parameters):
     plt.savefig('epoch '+str(epoch)+'.png')
     os.chdir(cwd)
     plt.clf()
-
 
 def plot_learning_rate_scan(lr_rates, total_loss, epoch, path):
 
