@@ -52,7 +52,7 @@ Running_DeepMergeDomainAdaptation_files.ipynb
 
 
 ### Requirements
-Code was developed using Pytorch 1.7.0. The requirements.txt file should list all Python libraries that your notebooks depend on, and they can be installed using:
+Code was developed using Pytorch 1.7.0. The requirements.txt file should list all Python libraries that your notebooks will need, and they can be installed using:
 ```
 pip install -r requirements.txt
 ```
