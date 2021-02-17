@@ -1,3 +1,19 @@
+'''
+Example script to make GradCams: 
+!python gradcam_vis.py --gpu_id 0 \
+                              --net DeepMerge \
+                              --dset 'galaxy' \
+                              --ckpt_path 'output_DeepMerge_SDSS/MMD+F' \
+                              --dset_path 'arrays/SDSS_Illustris_z0/' \
+                              --source_x_file Illustris_Xdata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                              --source_y_file Illustris_ydata_05_augmented_combined_rotzoom_SMALL_3000_3000.npy \
+                              --target_x_file SDSS_x_data_mergers_and_nonmergers.npy \
+                              --target_y_file SDSS_y_data_mergers_and_nonmergers.npy \
+                              --which 'source'
+                              --classy 'non-merger'
+'''
+
+# Importing needed packages
 import argparse
 import os
 import os.path as osp
@@ -28,7 +44,7 @@ from grad_cam import grad_cam
 
 def cam(config):
     ## prepare data
-
+    
     classes = {}
     classes[0] = 'non-merger'
     classes[1] = 'merger'
@@ -52,6 +68,8 @@ def cam(config):
     ckpt = torch.load(config['ckpt_path']+'/best_model.pth.tar')
 
     ## set base network
+    ## WARNING: ResNet18 will not produce good GradCAMs due to 2x2 convolutional layer at end of last block.
+    
     net_config = config["network"]
     base_network = net_config["name"](**net_config["params"])
     base_network.load_state_dict(ckpt['base_network'])
@@ -61,7 +79,6 @@ def cam(config):
     if use_gpu:
         base_network = base_network.cuda()
 
-        #might not get to tstack this?
         source_images = torch.stack(list(dsets["source"])).cuda()
         target_images = torch.stack(list(dsets["target"])).cuda()
 
@@ -72,7 +89,7 @@ def cam(config):
     if config["class"] == 'non-merger':
         target_class = 0 #non-merger
     elif config["class"] == 'merger':
-        target_class = 1 #non-merger
+        target_class = 1 #merger
     else:
         print("incorrect class choice")
         sys.exit()
@@ -85,7 +102,8 @@ def cam(config):
     else:
         os.chdir(save_where)
 
-    # Layer choice for network 'DeepMerge', final conolutyional layer:
+    # Layer choice for network 'DeepMerge', final convolutional layer:
+    # Change for ResNet18 (although, we don't recommend trying to plot ResNet18 GradCams due to dimensionality)
     heatmap_layer = base_network.conv3
     
     if config["which"] == 'source':
@@ -96,11 +114,12 @@ def cam(config):
             label = target_class
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
             
-            # saving Grad-CAMs as numpy arrays
+            # NUMPY ARRAYS: saving Grad-CAMs as numpy arrays
             with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
                 np.save(f, np.asarray(image))
             
-            ## Saving LogNorm galaxy images (uncomment if you want to save in image form)
+            ## IMAGE FORM: uncomment if you want to save in image form
+            # Saving LogNorm galaxy images
             # my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
             # my_cmap.set_bad(my_cmap.colors[0])
             # fig1=plt.figure(figsize=(8,8))
@@ -110,12 +129,8 @@ def cam(config):
             # plt.savefig(osp.join(
             #     output_dir,
             #     "image{}-{}.png".format(j, classes[target_class])))
-            ## Save galaxy image as npy array if needed:
-            # with open(osp.join(output_dir, "image{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
-            #     np.save(f, np.asarray(image))
                 
-            ## Saving Grad-CAMs without overplotted galaxy image (uncomment if you want to save in image form)
-            ## in case we want to save it as image
+            ## Saving Grad-CAMs without overplotted galaxy image
             # cv2.imwrite(osp.join(
             #     output_dir,
             #     "{}-{}.png".format(j, classes[target_class])), image)
@@ -132,7 +147,8 @@ def cam(config):
             with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
                 np.save(f, np.asarray(image))
                 
-            ## Saving LogNorm galaxy images (uncomment if you want to save in image form)
+            ## IMAGE FORM: uncomment if you want to save in image form
+            ## Saving LogNorm galaxy images
             # my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
             # my_cmap.set_bad(my_cmap.colors[0])
             # fig1=plt.figure(figsize=(8,8))
@@ -142,11 +158,8 @@ def cam(config):
             # plt.savefig(osp.join(
             #     output_dir,
             #     "image{}-{}.png".format(j, classes[target_class])))
-            ## Save galaxy image as npy array if needed:
-            # with open(osp.join(output_dir, "image{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
-            #     np.save(f, np.asarray(image))
                 
-            #Saving Grad-CAMs without overplotted galaxy image (uncomment if you want to save in image form)
+            #Saving Grad-CAMs without overplotted galaxy image
             ## in case we want to save it as image
             # cv2.imwrite(osp.join(
             #     output_dir,
@@ -193,7 +206,6 @@ if __name__ == "__main__":
         network_class = network.ResNetFc
         config["network"] = {"name":network_class, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
-
 
     config["dataset"] = args.dset
     config["path"] = args.dset_path
