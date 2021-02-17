@@ -148,15 +148,6 @@ def train(config):
         ckpt = torch.load(config['ckpt_path']+'/best_model.pth.tar')
         base_network.load_state_dict(ckpt['base_network'])
 
-        # i = 0
-        # for param in base_network.parameters():
-        #     if i < 6:
-        #         param.requires_grad = False
-        #         #print(param)
-        #     #else:
-        #         #print(param)
-        #     i+=1
-
     use_gpu = torch.cuda.is_available()
     if use_gpu:
         base_network = base_network.cuda()
