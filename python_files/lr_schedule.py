@@ -1,7 +1,8 @@
 import numpy as np
 
 def inv_lr_scheduler(param_lr, optimizer, iter_num, epoch_length, extra_lr, extra_cycle, gamma, power, init_lr=0.001, weight_decay=5e-4):
-	"""Decay learning rate by a factor of 0.1 every lr_decay_epoch epochs."""
+	'''Decay learning rate by a factor of 0.1 every lr_decay_epoch epochs.'''
+	
 	lr = init_lr * (1 + gamma * iter_num) ** (-power)
 	i=0
 	for param_group in optimizer.param_groups:
@@ -12,6 +13,9 @@ def inv_lr_scheduler(param_lr, optimizer, iter_num, epoch_length, extra_lr, extr
 	return optimizer
 
 def cycle1(param_lr, optimizer, iter_num, epoch_length, lr, cycle_length, **kwargs):
+	'''One-Cycle Learning Rate: Sets the learing rate of each parameter group by the one cycle learning rate policy proposed in
+	https://arxiv.org/pdf/1708.07120.pdf. Inspired by https://github.com/dkumazaw/onecyclelr/blob/master/onecyclelr.py.'''
+	
 	min_lr = lr/10
 	max_lr = lr
 	num_steps = cycle_length*epoch_length
@@ -21,8 +25,6 @@ def cycle1(param_lr, optimizer, iter_num, epoch_length, lr, cycle_length, **kwar
 
 	optim_dict = optimizer.state_dict()
 	
-	#print(optim_dict)
-
 	if 'momentum' in optim_dict['param_groups'][0]:
 		momentum = optim_dict['param_groups'][0]['momentum']
 		min_momentum = momentum
@@ -65,15 +67,11 @@ def cycle1(param_lr, optimizer, iter_num, epoch_length, lr, cycle_length, **kwar
 
 
 def linear_to_find_baseline(param_lr, optimizer, iter_num, epoch_length, lr, extra_cycle, **kwargs):
+	'''Implemented learning rate range search.'''
 
-	# min_lr = lr/1000
-	# max_lr = 1000*lr
 	num_epochs = 5
-	# lr_spectrum = np.arange(min_lr, num_epochs, max_lr)
 	lr_spectrum = np.linspace(1e-6, 1e-1, 85*num_epochs+1)
 	num_steps = epoch_length
-
-	#on_step = iter_num//epoch_length
 
 	lr = lr_spectrum[iter_num]
 
