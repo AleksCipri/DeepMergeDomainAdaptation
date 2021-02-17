@@ -1,6 +1,6 @@
 '''
 Example script to launch training: 
-!python galaxy_train.py --gpu_id 0 \
+!python train_MMD.py --gpu_id 0 \
                               --net DeepMerge \
                               --dset 'galaxy' \
                               --dset_path 'arrays/SDSS_Illustris_z0/' \
@@ -188,8 +188,6 @@ def train(config):
     scan_lr = []
     scan_loss = []
 
-
-
     ###################
     ###### TRAIN ######
     ###################
@@ -254,7 +252,6 @@ def train(config):
 
         if config["optimizer"]["lr_type"] == "linear":
             optimizer = lr_scheduler(param_lr, optimizer, i, config["log_iter"], config["frozen lr"], config["cycle_length"], **schedule_param)
-
 
         optim = optimizer.state_dict()
         scan_lr.append(optim['param_groups'][0]['lr'])
@@ -639,7 +636,7 @@ if __name__ == "__main__":
         config["optimizer"] = {"type":"SGD", "optim_params":{"lr":1.0, "momentum":0.9, \
                                "weight_decay": config["weight_decay"], "nesterov":True}, "lr_type":"inv", \
                                "lr_param":{"init_lr":0.001, "gamma":0.001, "power":0.75} }
-
+        
     # Learning rate paramters
     if args.lr is not None:
         config["optimizer"]["optim_params"]["lr"] = args.lr
