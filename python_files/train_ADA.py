@@ -1,6 +1,6 @@
 '''
 Example script to launch training: 
-!python train_ada_updated.py --gpu_id 0 \
+!python train_ADA.py --gpu_id 0 \
                               --net DeepMerge \
                               --dset 'galaxy' \
                               --dset_path 'arrays/SDSS_Illustris_z0/' \
