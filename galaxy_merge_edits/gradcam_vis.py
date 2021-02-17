@@ -39,8 +39,6 @@ def cam(config):
     pristine_x_test = pristine_x[int(np.floor(.98*len(pristine_x))):]
     pristine_y_test = pristine_y[int(np.floor(.98*len(pristine_x))):]
 
-
-    #noisy_indices = torch.randperm(len(noisy_x))
     noisy_x_test = noisy_x[int(np.floor(.98*len(noisy_x))):]
     noisy_y_test = noisy_y[int(np.floor(.98*len(noisy_x))):]
 
@@ -87,39 +85,18 @@ def cam(config):
     else:
         os.chdir(save_where)
 
-    #if config["network"]["name"] == 'DeepMerge':
+    # Layer choice for network 'DeepMerge', final conolutyional layer:
     heatmap_layer = base_network.conv3
-    #else:
-    #    heatmap_layer = base_network.layer4[1].conv2
-
+    
     if config["which"] == 'source':
         print("start source test: ")
         
         for j in range(0, len(source_images)-1):
             input_tensor = source_images[j]
             label = target_class
-
-            ## Saving LogNorm galaxy images
-            # my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
-            # my_cmap.set_bad(my_cmap.colors[0])
-            # fig1=plt.figure(figsize=(8,8))
-            # plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            # plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            # plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            # plt.savefig(osp.join(
-            #     output_dir,
-            #     "image{}-{}.png".format(j, classes[target_class])))
-            # with open(osp.join(output_dir, "image{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
-            #     np.save(f, np.asarray(image))
-
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
-            #Saving Grad-CAMs without overplotted galaxy image
-            ## in case we want to save it as image
-            # cv2.imwrite(osp.join(
-            #     output_dir,
-            #     "{}-{}.png".format(j, classes[target_class])), image)
-
-            #saving Grad-CAMs as numpy arrays
+            
+            # saving Grad-CAMs as numpy arrays
             with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
                 np.save(f, np.asarray(image))
 
@@ -127,31 +104,13 @@ def cam(config):
         print("start target test: ")
         
         for j in range(0, len(target_images)-1):
-
             input_tensor = target_images[j]
             label = target_class
-
-            #my_cmap = copy.copy(plt.cm.get_cmap('inferno'))
-            #my_cmap.set_bad(my_cmap.colors[0])
-            #fig1=plt.figure(figsize=(8,8))
-            #plt.imshow(input_tensor[0].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            #plt.imshow(input_tensor[1].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            #plt.imshow(input_tensor[2].cpu(), aspect='auto', cmap=my_cmap, norm=LogNorm())
-            # plt.savefig(osp.join(
-            #     output_dir,
-            #     "image{}-{}.png".format(j, classes[target_class])))
-
-            with open(osp.join(output_dir, "{}-{}-IMAGE.npy".format(j, classes[target_class])), 'wb') as g:
-                np.save(g, np.asarray(input_tensor[0].cpu()))
-
+            
+            # saving Grad-CAMs as numpy arrays
             image = grad_cam(base_network, input_tensor, heatmap_layer, label)
-            # cv2.imwrite(osp.join(
-            #     output_dir,
-            #     "{}-{}.png".format(j, classes[target_class])), image)
-
             with open(osp.join(output_dir, "{}-{}.npy".format(j, classes[target_class])), 'wb') as f:
                 np.save(f, np.asarray(image))
-            # plt.close('all')
 
     else:
         print("incorrect domain choice")
@@ -195,7 +154,6 @@ if __name__ == "__main__":
         config["network"] = {"name":network_class, \
             "params":{"resnet_name":args.net, "use_bottleneck":True, "bottleneck_dim":256, "new_cls":True} }
 
-    #how do we handle adnet?
 
     config["dataset"] = args.dset
     config["path"] = args.dset_path
