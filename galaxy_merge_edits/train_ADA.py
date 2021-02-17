@@ -158,15 +158,6 @@ def train(config):
         print('load model from {}'.format(config['ckpt_path']))
         ckpt = torch.load(config['ckpt_path']+'/best_model.pth.tar')
         base_network.load_state_dict(ckpt['base_network'])
-
-        # i = 0
-        # for param in base_network.parameters():
-        #     if i < 6:
-        #         param.requires_grad = False
-        #         #print(param)
-        #     #else:
-        #         #print(param)
-        #     i+=1
         ad_net.load_state_dict(ckpt['ad_net'])
 
     # Class weights in case we need them, hewe we have balanced sample so weights are 1.0
