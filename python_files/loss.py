@@ -8,10 +8,10 @@ from functools import partial
 from itertools import combinations
 from sklearn.metrics import pairwise_distances, pairwise
 
-
 def EntropyLoss(input_):
     '''
-    Entropy minimizaiton loss
+    Entropy minimizaiton loss adapted from: https://github.com/HKUST-KnowComp/FisherDA/blob/master/src/loss.py.
+
     Args:
         input_: network outputs
     Rerurns:
@@ -22,9 +22,8 @@ def EntropyLoss(input_):
     entropy = -(torch.sum(mask_out * torch.log(mask_out)))
     return entropy / float(input_.size(0))
 
-
 def PADA(features, ad_net, grl_layer, weight_ad, use_gpu=True):
-    '''Domain adversarial loss
+    '''Domain adversarial loss adapted from: https://github.com/HKUST-KnowComp/FisherDA/blob/master/src/loss.py.
     Args: 
         features: torch.FloatTensor, concatenated source domain and target domain features
         ad_net: nn.Module, domain classification network
@@ -43,8 +42,7 @@ def PADA(features, ad_net, grl_layer, weight_ad, use_gpu=True):
     return nn.BCELoss(weight=weight_ad.view(-1))(ad_out.view(-1), dc_target.view(-1))
 
 def CORAL(source, target):
-    '''CORAL loss
-       https://github.com/SSARCandy/DeepCORAL/blob/master/models.py
+    '''CORAL loss adapted from https://github.com/SSARCandy/DeepCORAL/blob/master/models.py
     '''
     batch_size, d = source.size()  # assume that source, target are 2d tensors
 
@@ -62,7 +60,6 @@ def CORAL(source, target):
 
     return loss
 
-
 def compute_pairwise_distances(x, y):
     if not x.dim() == y.dim() == 2:
         raise ValueError('Both inputs should be matrices.')
@@ -72,10 +69,9 @@ def compute_pairwise_distances(x, y):
     norm = lambda x: torch.sum(torch.pow(x, 2), 1)
     return torch.transpose(norm(torch.unsqueeze(x, 2) - torch.transpose(y, 0, 1)), 0, 1)
 
-
 def gaussian_kernel_matrix(x, y, sigmas):
     '''
-    Gaussian RBF kernel to be used in MMD
+    Gaussian RBF kernel to be used in MMD adapted from: https://github.com/HKUST-KnowComp/FisherDA/blob/master/src/loss.py.
     Args:
     x,y: latent features
     sigmas: free parameter that determins the width of the kernel
@@ -86,10 +82,9 @@ def gaussian_kernel_matrix(x, y, sigmas):
     s = torch.matmul(beta, dist.contiguous().view(1, -1))
     return torch.sum(torch.exp(-s), 0).view(*dist.size())
 
-
 def maximum_mean_discrepancy(x, y, kernel=gaussian_kernel_matrix):
     ''' 
-    Calculate the matrix that includes all kernels k(xx), k(y,y) and k(x,y)
+    Calculate the matrix that includes all kernels k(xx), k(y,y) and k(x,y).
     '''
     cost = torch.mean(kernel(x, x))
     cost += torch.mean(kernel(y, y))
@@ -98,10 +93,9 @@ def maximum_mean_discrepancy(x, y, kernel=gaussian_kernel_matrix):
     cost = torch.clamp(cost, min=0.0)
     return cost
 
-
 def mmd_distance(hs, ht):
     '''
-    Maximum Mean Discrepancy - MMD
+    Maximum Mean Discrepancy - MMD adapted from: https://github.com/HKUST-KnowComp/FisherDA/blob/master/src/loss.py.
     Args:
         hs: source domain embeddings
         ht: target domain embeddings
@@ -115,13 +109,9 @@ def mmd_distance(hs, ht):
     loss_value = maximum_mean_discrepancy(hs, ht, kernel=gaussian_kernel)
     return torch.clamp(loss_value, min=1e-4)
 
-
 class FisherTD(nn.Module):
-    '''Fisher loss in trace differenc forme. MMC loss by auto-grad
-    adapted from: https://github.com/KaiyangZhou/pytorch-center-loss/blob/master/center_loss.py
-
-    Reference:
-    Wen et al. A Discriminative Feature Learning Approach for Deep Face Recognition. ECCV 2016.
+    '''Fisher loss in trace differenc forme. MMC loss by auto-grad adapted from:
+    https://github.com/KaiyangZhou/pytorch-center-loss/blob/master/center_loss.py.
 
     Args:
         num_classes (int): number of classes.
@@ -185,13 +175,8 @@ class FisherTD(nn.Module):
         loss = intra_loss_weight * intra_loss - inter_loss_weight * inter_loss
         return loss, intra_loss, inter_loss, None
 
-
 class FisherTR(nn.Module):
-    ''' Fisher loss in Trace Ratio form
-    adapted from: https://github.com/KaiyangZhou/pytorch-center-loss/blob/master/center_loss.py
-
-    Reference:
-    Wen et al. A Discriminative Feature Learning Approach for Deep Face Recognition. ECCV 2016.
+    ''' Fisher loss in Trace Ratio adapted from: https://github.com/KaiyangZhou/pytorch-center-loss/blob/master/center_loss.py.
 
     Args:
         num_classes (int): number of classes.
