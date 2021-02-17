@@ -1,4 +1,4 @@
-#optional for plotting
+#optional plotting methods
 
 def plot_grad_flow(path, epoch, named_parameters):
     '''Plots the gradients flowing through different layers in the net during training.
@@ -42,6 +42,7 @@ def plot_grad_flow(path, epoch, named_parameters):
     plt.clf()
 
 def plot_learning_rate_scan(lr_rates, total_loss, epoch, path):
+    '''Plot learning rate scan to find ideal learning rate for one-cycle learning.'''
 
     import matplotlib.pyplot as plt
     import numpy as np
