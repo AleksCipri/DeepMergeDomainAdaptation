@@ -1,4 +1,5 @@
 '''
+Example script to launch training: 
 !python no_domain_adaptation.py --gpu_id 0 \
                               --net DeepMerge \
                               --dset 'galaxy' \
