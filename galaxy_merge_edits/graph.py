@@ -10,6 +10,8 @@ from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.autograd import Variable
 from import_and_normalize import array_to_tensor, update
 
+#Run to create onnx file of your network. Open onnx file with DeepMergeDomainAdaptation/network graphs/network_graphs.ipynb.
+
 def show_me_the_graphs(config):
 
 	if config["network"] == "DeepMerge":
