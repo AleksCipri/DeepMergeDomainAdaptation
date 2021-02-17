@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 class EarlyStopping(object):
     """EarlyStopping handler can be used to stop the training if no improvement after a given number of events
-    adapted from: https://github.com/HKUST-KnowComp/FisherDA/blob/master/src/loss.py.
+    adapted from: https://github.com/HKUST-KnowComp/FisherDA/blob/master/src/utils.py.
     Args:
         patience (int):
             Number of events to wait if no improvement and then stop the training
@@ -53,7 +53,7 @@ class EarlyStopping(object):
 
 
 def domain_cls_accuracy(d_out):
-    '''Domain classification accuracy adapted from: https://github.com/HKUST-KnowComp/FisherDA/blob/master/src/loss.py.
+    '''Domain classification accuracy adapted from: https://github.com/HKUST-KnowComp/FisherDA/blob/master/src/utils.py.
     Args: 
         d_out: torch.FloatTensor, output of the domain classification network
     Returns:
@@ -72,7 +72,7 @@ def domain_cls_accuracy(d_out):
 
 
 def distance_to_centroids(x, centroids):
-    '''Euclidean distance of a batch of samples to class centers adapted from: https://github.com/HKUST-KnowComp/FisherDA/blob/master/src/loss.py.
+    '''Euclidean distance of a batch of samples to class centers adapted from: https://github.com/HKUST-KnowComp/FisherDA/blob/master/src/utils.py.
     Args:
         x: FloatTensor [batch_size, d]
         centroids: FloatTensor [K, d] where K is the number of classes
