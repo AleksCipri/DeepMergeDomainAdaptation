@@ -11,6 +11,7 @@ Run to create onnx file of your network. Open onnx file with network_graphs.ipyn
                               --target_y_file SDSS_y_data_postmergers_and_nonmergers.npy \
 '''
 
+#Importing needed packages
 import network
 import torch
 import netron
@@ -61,9 +62,6 @@ def show_me_the_graphs(config):
 	#give a dummy batch, except wait, features are important for ad_net
 	inputs_source, labels_source = iter(dset_loaders["source"]).next()
 	inputs_target, labels_target = iter(dset_loaders["target"]).next()
-
-	# source_batch = torch.from_numpy(np.array(source_batch, dtype='int32'))
-	# target_batch = torch.from_numpy(np.array(target_batch, dtype='int32'))
 
 	if use_gpu:
 		source_batch = Variable(inputs_source).cuda()
