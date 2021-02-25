@@ -13,7 +13,7 @@ Our experiments were performed using a simple CNN architecture (3 convolutional,
 visualize_netgraph.ipynb 
 ```
 
-### Prepare Datasets
+### Datasets
 The images used can be found at Zenodo: 10.5281/zenodo.4507941. There are two types of experiments we run: Simulation to Simulation and Simulation to Real.
 
 #### Simulation to Simulation Experiments
