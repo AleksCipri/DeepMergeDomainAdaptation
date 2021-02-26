@@ -14,7 +14,7 @@ visualize_netgraph.ipynb
 ```
 
 ### Datasets
-The images used can be found at Zenodo: 10.5281/zenodo.4507941. There are two types of experiments we run: Simulation to Simulation and Simulation to Real.
+The images used can be found at [Zenodo](https://doi.org/10.5281/zenodo.4507941). There are two types of experiments we run: Simulation to Simulation and Simulation to Real.
 
 #### Simulation to Simulation Experiments
 Data used to study distant merging galaxies using simulated images from the Illustris-1 cosmological simulation at redshift z=2. The images are 75x75 pixels with three filters applied that mimic Hubble Space Telescope (HST) observations (ACS F814W,NC F356W, WFC3 F160W) with added point-spread function and with or without observational noise.
