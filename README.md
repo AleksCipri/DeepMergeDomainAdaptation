@@ -67,4 +67,4 @@ pip install -r requirements.txt
 - Gabriel Perdue
 
 ### References
-If you use this code, please cite our paper: arXiv:..........
+If you use this code, please cite our paper: [arXiv:2103.01373](https://arxiv.org/abs/2103.01373)
