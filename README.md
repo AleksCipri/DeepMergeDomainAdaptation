@@ -67,4 +67,6 @@ pip install -r requirements.txt
 - Gabriel Perdue
 
 ### References
-If you use this code, please cite our paper: [arXiv:2103.01373](https://arxiv.org/abs/2103.01373)
+If you use this code, please cite our paper: 
+"DeepMerge II: Building Robust Deep Learning Algorithms for Merging Galaxy Identification Across Domains": A. \'Ciprijanovi\'c, D. Kafkes, K. Downey, S. Jenkins, G.~N. Perdue, S. Madireddy, T. Johnston, G.~F. Snyder,  B. Nord, 2021, \textit{MNRAS}, 605, 677-691
+[arXiv:2103.01373](https://arxiv.org/abs/2103.01373)
